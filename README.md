@@ -1,6 +1,19 @@
 # Generative Decision Surface
 
-Standalone prototype of an AI decision workspace that composes the interface required by a decision instead of returning a text-only answer.
+**An interface that assembles itself around the decision.** This prototype begins as an empty computational workspace, plans the instruments required by a vendor-selection decision, then builds and connects those instruments live.
+
+## Art direction
+
+The Surface is a spatial operating system: bright neutral canvas, strict grid, square instrument modules, tiny runtime typography, visible data dependencies, and fast layout changes. It intentionally avoids chat UI, glass, paper texture, and decorative 3D.
+
+## Core interactions
+
+- Empty workspace → planning → live module assembly.
+- React Flow dependency graph with draggable and deletable instrument nodes.
+- Zustand-backed criteria and budget state; dependent recommendation content recomputes instantly.
+- Command palette and `Focus on Security` spatial reconfiguration.
+- Vendor matrix, risk vector, counter-case, rationale, and human decision gate.
+- Responsive compact workstation layout and reduced-motion behavior.
 
 ## Run locally
 

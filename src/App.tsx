@@ -1,229 +1,318 @@
-import { useMemo, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Background,
+  Controls,
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
+  type Edge,
+  type Node,
+} from '@xyflow/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { create } from 'zustand';
-import { ArrowLeft, Check, CircleDollarSign, Database, Grip, Layers3, LockKeyhole, Minus, Scale, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, WandSparkles } from 'lucide-react';
-import { AmbientBackdrop, Eyebrow, GlassCard, GlowButton, PointerLight, StatusPill } from './lib/design-system';
+import {
+  Activity,
+  ArrowDown,
+  ArrowRight,
+  Boxes,
+  Braces,
+  Check,
+  CircleDollarSign,
+  Command,
+  Cpu,
+  Database,
+  Focus,
+  Gauge,
+  Grip,
+  LockKeyhole,
+  Minus,
+  Network,
+  Play,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  WandSparkles,
+  X,
+} from 'lucide-react';
 import { vendorEvidence } from './lib/mock-ai';
 
 type Criterion = 'cost' | 'security' | 'accuracy' | 'adoption';
-type BlockType = 'vendors' | 'weights' | 'cost' | 'risk' | 'rationale' | 'counter' | 'decision';
+type BlockType = 'brief' | 'weights' | 'vendors' | 'cost' | 'risk' | 'rationale' | 'counter' | 'decision';
 
 type SurfaceStore = {
-  blocks: BlockType[];
   weights: Record<Criterion, number>;
   budget: number;
   focus: Criterion | null;
-  removeBlock: (block: BlockType) => void;
-  shiftBlock: (block: BlockType, direction: -1 | 1) => void;
   setWeight: (criterion: Criterion, value: number) => void;
   setBudget: (value: number) => void;
   setFocus: (criterion: Criterion | null) => void;
-  setBlocks: (blocks: BlockType[]) => void;
 };
 
-const initialBlocks: BlockType[] = ['vendors', 'weights', 'cost', 'risk', 'rationale', 'counter', 'decision'];
-
-const useSurface = create<SurfaceStore>((set) => ({
-  blocks: [],
-  weights: { cost: 72, security: 84, accuracy: 78, adoption: 64 },
+const useSurfaceStore = create<SurfaceStore>((set) => ({
+  weights: { cost: 24, security: 31, accuracy: 27, adoption: 18 },
   budget: 72,
   focus: null,
-  removeBlock: (block) => set((state) => ({ blocks: state.blocks.filter((item) => item !== block) })),
-  shiftBlock: (block, direction) => set((state) => {
-    const index = state.blocks.indexOf(block);
-    if (index < 0) return state;
-    const target = Math.max(0, Math.min(state.blocks.length - 1, index + direction));
-    const next = [...state.blocks];
-    next.splice(index, 1);
-    next.splice(target, 0, block);
-    return { blocks: next };
-  }),
   setWeight: (criterion, value) => set((state) => ({ weights: { ...state.weights, [criterion]: value } })),
   setBudget: (budget) => set({ budget }),
-  setFocus: (focus) => set((state) => ({ focus, weights: focus === 'security' ? { ...state.weights, security: 100, cost: 48, accuracy: 72, adoption: 58 } : state.weights })),
-  setBlocks: (blocks) => set({ blocks }),
+  setFocus: (focus) => set({ focus }),
 }));
 
 const vendors = [
-  { name: 'Helix AI', key: 'Helix', price: 68, security: 94, accuracy: 91, adoption: 76, accent: 'mint' },
-  { name: 'Northstar Vision', key: 'Northstar', price: 48, security: 82, accuracy: 88, adoption: 91, accent: 'amber' },
-  { name: 'Veridian Systems', key: 'Veridian', price: 91, security: 90, accuracy: 96, adoption: 62, accent: 'violet' },
-] as const;
+  { name: 'Helix', cost: 76, security: 94, accuracy: 91, adoption: 67 },
+  { name: 'Northstar', cost: 91, security: 84, accuracy: 88, adoption: 93 },
+  { name: 'Veridian', cost: 58, security: 91, accuracy: 96, adoption: 62 },
+];
 
-const criteriaMeta: Record<Criterion, { label: string; icon: React.ReactNode }> = {
-  cost: { label: 'Cost', icon: <CircleDollarSign size={13} /> },
-  security: { label: 'Security', icon: <LockKeyhole size={13} /> },
-  accuracy: { label: 'Accuracy', icon: <ShieldCheck size={13} /> },
-  adoption: { label: 'Field adoption', icon: <Layers3 size={13} /> },
-};
+const blockDefinitions: Array<{ type: BlockType; title: string; position: { x: number; y: number } }> = [
+  { type: 'brief', title: 'Decision brief', position: { x: 40, y: 70 } },
+  { type: 'weights', title: 'Criteria weights', position: { x: 385, y: 45 } },
+  { type: 'vendors', title: 'Vendor matrix', position: { x: 770, y: 65 } },
+  { type: 'cost', title: 'Budget constraint', position: { x: 225, y: 390 } },
+  { type: 'risk', title: 'Risk vector', position: { x: 560, y: 385 } },
+  { type: 'rationale', title: 'Recommendation logic', position: { x: 930, y: 390 } },
+  { type: 'counter', title: 'Counter-case', position: { x: 420, y: 685 } },
+  { type: 'decision', title: 'Decision gate', position: { x: 800, y: 690 } },
+];
 
-export function App() {
-  const { blocks, weights, budget, focus, removeBlock, shiftBlock, setWeight, setBudget, setFocus, setBlocks } = useSurface();
-  const [phase, setPhase] = useState<'empty' | 'generating' | 'complete'>('empty');
-  const [assembling, setAssembling] = useState<BlockType | null>(null);
+const relatedToSecurity: BlockType[] = ['weights', 'vendors', 'risk', 'rationale', 'counter'];
 
-  const scored = useMemo(() => {
-    return vendors.map((vendor) => {
-      const costScore = Math.max(0, 100 - Math.abs(vendor.price - budget) * 1.3);
-      const score = (
-        costScore * weights.cost + vendor.security * weights.security + vendor.accuracy * weights.accuracy + vendor.adoption * weights.adoption
-      ) / (weights.cost + weights.security + weights.accuracy + weights.adoption);
-      return { ...vendor, score: Math.round(score * 10) / 10 };
-    }).sort((a, b) => b.score - a.score);
-  }, [budget, weights]);
+function scoreVendor(vendor: (typeof vendors)[number], weights: Record<Criterion, number>, budget: number) {
+  const costFit = Math.max(20, 100 - Math.abs(vendor.cost - budget) * 1.5);
+  const weighted = costFit * weights.cost + vendor.security * weights.security + vendor.accuracy * weights.accuracy + vendor.adoption * weights.adoption;
+  return Math.round(weighted / Object.values(weights).reduce((sum, value) => sum + value, 0));
+}
 
-  const generate = async () => {
-    setBlocks([]);
-    setPhase('generating');
-    for (const block of initialBlocks) {
-      setAssembling(block);
-      await new Promise((resolve) => window.setTimeout(resolve, 310));
-      setBlocks(useSurface.getState().blocks.concat(block));
-    }
-    setAssembling(null);
-    setPhase('complete');
-  };
+function InstrumentShell({ title, code, children, emphasis = false }: { title: string; code: string; children: React.ReactNode; emphasis?: boolean }) {
+  return (
+    <section className={`instrument-shell ${emphasis ? 'instrument-emphasis' : ''}`}>
+      <div className="instrument-head"><span>{code}</span><b>{title}</b><Grip size={12} /></div>
+      <div className="instrument-body">{children}</div>
+    </section>
+  );
+}
 
-  const renderBlock = (block: BlockType) => {
-    const winner = scored[0];
-    switch (block) {
-      case 'vendors':
+function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; code: string }; id: string }) {
+  const weights = useSurfaceStore((state) => state.weights);
+  const budget = useSurfaceStore((state) => state.budget);
+  const focus = useSurfaceStore((state) => state.focus);
+  const setWeight = useSurfaceStore((state) => state.setWeight);
+  const setBudget = useSurfaceStore((state) => state.setBudget);
+  const scores = vendors.map((vendor) => ({ ...vendor, score: scoreVendor(vendor, weights, budget) })).sort((a, b) => b.score - a.score);
+  const winner = scores[0];
+  const emphasized = focus === 'security' && relatedToSecurity.includes(data.type);
+
+  const body = (() => {
+    switch (data.type) {
+      case 'brief':
+        return <div className="brief-copy"><span>INPUT / 001</span><p>Compare three AI solution vendors by cost, security, accuracy, and field adoption difficulty.</p><div><Braces size={12} /> 4 criteria · 3 vendors · 1 recommendation</div></div>;
+      case 'weights':
         return (
-          <div className="vendor-grid">
-            {scored.map((vendor, index) => (
-              <motion.div layout key={vendor.name} className={`vendor-card vendor-${vendor.accent} ${index === 0 ? 'winner' : ''}`}>
-                <div><span>{index === 0 ? 'Recommended' : `Option 0${index + 1}`}</span><strong>{vendor.score}</strong></div>
-                <h3>{vendor.name}</h3>
-                <div className="vendor-metrics"><span>${vendor.price}k</span><span>{vendor.security} sec</span><span>{vendor.accuracy}% acc</span></div>
-              </motion.div>
+          <div className="weight-stack nodrag nowheel">
+            {(Object.keys(weights) as Criterion[]).map((criterion) => (
+              <label key={criterion}><span>{criterion}</span><input type="range" min="5" max="60" value={weights[criterion]} onChange={(event) => setWeight(criterion, Number(event.target.value))} /><b>{weights[criterion]}</b></label>
             ))}
           </div>
         );
-      case 'weights':
+      case 'vendors':
         return (
-          <div className="weight-list">
-            {(Object.keys(criteriaMeta) as Criterion[]).map((criterion) => (
-              <label key={criterion} className={focus === criterion ? 'focused' : ''}>
-                <span>{criteriaMeta[criterion].icon}{criteriaMeta[criterion].label}<b>{weights[criterion]}</b></span>
-                <input type="range" min="20" max="100" value={weights[criterion]} onChange={(event) => setWeight(criterion, Number(event.target.value))} />
-              </label>
-            ))}
+          <div className="vendor-matrix">
+            <div className="matrix-row matrix-head"><span>vendor</span><span>sec.</span><span>acc.</span><span>fit</span></div>
+            {scores.map((vendor, index) => <div className={`matrix-row ${index === 0 ? 'matrix-best' : ''}`} key={vendor.name}><span title={vendorEvidence[vendor.name as keyof typeof vendorEvidence].join(' · ')}>{vendor.name}{index === 0 ? <Check size={10} /> : null}</span><b>{vendor.security}</b><b>{vendor.accuracy}</b><strong>{vendor.score}</strong></div>)}
           </div>
         );
       case 'cost':
-        return (
-          <div className="budget-control">
-            <div><span>Budget comfort ceiling</span><strong>${budget}k</strong></div>
-            <input type="range" min="35" max="110" value={budget} onChange={(event) => setBudget(Number(event.target.value))} />
-            <div className="budget-axis"><span>$35k</span><span>$110k</span></div>
-            <p>Changing this reshapes cost-fit and can change the recommendation instantly.</p>
-          </div>
-        );
+        return <div className="cost-control nodrag nowheel"><div><CircleDollarSign size={17} /><span>MAX INTEGRATION INDEX</span><strong>{budget}</strong></div><input type="range" min="45" max="95" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /><small>Changing this constraint recalculates only dependent blocks.</small></div>;
       case 'risk':
         return (
-          <div className="risk-chart" aria-label="Vendor risk chart">
-            {scored.map((vendor) => (
-              <div key={vendor.name}><span>{vendor.name.split(' ')[0]}</span><div><motion.i layout animate={{ width: `${100 - (vendor.security * .62 + vendor.adoption * .38 - 12)}%` }} /></div><b>{Math.round(100 - (vendor.security * .62 + vendor.adoption * .38 - 12))}</b></div>
-            ))}
-            <small>Residual deployment risk · lower is better</small>
+          <div className="risk-bars">
+            {scores.map((vendor) => { const risk = Math.round((100 - vendor.security) * .55 + (100 - vendor.adoption) * .45); return <div key={vendor.name}><span>{vendor.name}</span><i><b style={{ width: `${risk}%` }} /></i><strong>{risk}</strong></div>; })}
           </div>
         );
       case 'rationale':
-        return (
-          <div className="rationale-content">
-            <span className="ai-label"><Sparkles size={12} /> Generated recommendation</span>
-            <h3>{winner.name} best fits the current decision surface.</h3>
-            <p>Its weighted score stays strongest under the active cost, security, accuracy, and adoption constraints. The recommendation is recalculated from controls above, not hard-coded copy.</p>
-            <div className="evidence-chips">{vendorEvidence[winner.key].map((item) => <span key={item}><Database size={10} />{item}</span>)}</div>
-          </div>
-        );
+        return <div className="logic-output"><span>RECOMMEND / {winner.name}</span><h3>{winner.score}<small>/100</small></h3><p>{winner.name} currently wins because the active weighting values security and benchmark accuracy more heavily than deployment speed.</p><code>score = Σ(criteria × weight)</code></div>;
       case 'counter':
-        return (
-          <div className="counter-content">
-            <span><Scale size={13} /> Counterargument</span>
-            <p>{winner.key === 'Helix' ? 'Northstar may create more realized value if training capacity is constrained, because its field adoption score offsets lower benchmark accuracy.' : winner.key === 'Northstar' ? 'Helix becomes preferable when security weighting passes 88 or regulated workloads move on-prem.' : 'Veridian’s accuracy edge only pays off when defect cost is high enough to justify its integration burden.'}</p>
-          </div>
-        );
+        return <div className="counter-output"><Minus size={14} /><p>If field adoption weight rises above <b>34</b>, Northstar overtakes {winner.name}. Security remains the largest sensitivity in the current model.</p></div>;
       case 'decision':
-        return (
-          <div className="decision-actions">
-            <div><span>Decision confidence</span><strong>{Math.round(winner.score)}%</strong></div>
-            <button><Check size={15} /> Advance {winner.name} to pilot</button>
-            <button className="secondary"><Minus size={15} /> Hold decision</button>
-          </div>
-        );
+        return <div className="decision-gate"><span>READY FOR HUMAN DECISION</span><strong>{winner.name}</strong><button className="nodrag">Select recommendation <ArrowRight size={13} /></button></div>;
+      default:
+        return null;
     }
+  })();
+
+  return (
+    <>
+      <Handle type="target" position={Position.Left} className="data-handle" />
+      <InstrumentShell title={data.title} code={data.code} emphasis={emphasized}>{body}</InstrumentShell>
+      <button className="node-delete nodrag" aria-label={`Delete ${data.title}`} onClick={() => window.dispatchEvent(new CustomEvent('surface:delete', { detail: id }))}><X size={11} /></button>
+      <Handle type="source" position={Position.Right} className="data-handle" />
+    </>
+  );
+}
+
+const nodeTypes = { instrument: SurfaceNode };
+
+function SurfaceWorkspace() {
+  const reduced = Boolean(useReducedMotion());
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [phase, setPhase] = useState<'empty' | 'planning' | 'assembling' | 'complete'>('empty');
+  const [log, setLog] = useState<string[]>([]);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const focus = useSurfaceStore((state) => state.focus);
+  const setFocus = useSurfaceStore((state) => state.setFocus);
+  const weights = useSurfaceStore((state) => state.weights);
+  const budget = useSurfaceStore((state) => state.budget);
+
+  const scores = useMemo(() => vendors.map((vendor) => ({ ...vendor, score: scoreVendor(vendor, weights, budget) })).sort((a, b) => b.score - a.score), [weights, budget]);
+
+  const deleteNode = useCallback((id: string) => {
+    setNodes((current) => current.filter((node) => node.id !== id));
+    setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id));
+    setLog((current) => [`removed ${id}`, ...current].slice(0, 6));
+  }, [setEdges, setNodes]);
+
+  useEffect(() => {
+    const listener = (event: Event) => deleteNode((event as CustomEvent<string>).detail);
+    window.addEventListener('surface:delete', listener);
+    return () => window.removeEventListener('surface:delete', listener);
+  }, [deleteNode]);
+
+  const generateSurface = async () => {
+    setNodes([]);
+    setEdges([]);
+    setLog(['parsed decision request', 'identified 4 evaluation criteria', 'planning instrument graph']);
+    setPhase('planning');
+    if (!reduced) await new Promise((resolve) => window.setTimeout(resolve, 430));
+    setPhase('assembling');
+
+    for (let index = 0; index < blockDefinitions.length; index += 1) {
+      if (!reduced) await new Promise((resolve) => window.setTimeout(resolve, 145));
+      const block = blockDefinitions[index];
+      const node: Node = {
+        id: block.type,
+        type: 'instrument',
+        position: block.position,
+        data: { type: block.type, title: block.title, code: `M-${String(index + 1).padStart(2, '0')}` },
+        style: { width: block.type === 'vendors' ? 330 : block.type === 'rationale' ? 300 : 280 },
+      };
+      setNodes((current) => [...current, node]);
+      setLog((current) => [`mounted ${block.type} instrument`, ...current].slice(0, 6));
+
+      const edgeMap: Partial<Record<BlockType, BlockType[]>> = {
+        weights: ['brief'], vendors: ['weights'], cost: ['brief'], risk: ['vendors'], rationale: ['vendors', 'risk', 'cost'], counter: ['weights', 'rationale'], decision: ['rationale', 'counter'],
+      };
+      const inputs = edgeMap[block.type] ?? [];
+      setEdges((current) => [...current, ...inputs.map((source, edgeIndex) => ({ id: `${source}-${block.type}-${edgeIndex}`, source, target: block.type, animated: !reduced, markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 }, className: 'data-edge' }))]);
+    }
+    setPhase('complete');
+    setLog((current) => ['surface ready / dependencies live', ...current].slice(0, 6));
+  };
+
+  const focusSecurity = () => {
+    const nextFocus = focus === 'security' ? null : 'security';
+    setFocus(nextFocus);
+    setNodes((current) => current.map((node) => {
+      const type = node.id as BlockType;
+      if (!nextFocus) {
+        const original = blockDefinitions.find((block) => block.type === type);
+        return original ? { ...node, position: original.position } : node;
+      }
+      const order = relatedToSecurity.indexOf(type);
+      if (order >= 0) return { ...node, position: { x: 280 + (order % 3) * 350, y: 130 + Math.floor(order / 3) * 350 } };
+      return { ...node, position: { x: 1120 + (node.position.y % 280), y: 80 + node.position.y * .55 } };
+    }));
+    setLog((current) => [`${nextFocus ? 'focused' : 'released'} security dependency graph`, ...current].slice(0, 6));
   };
 
   return (
     <main className="surface-shell">
-      <AmbientBackdrop accent="255 199 115" />
-      <PointerLight />
-      <header className="surface-header">
-        <div className="surface-brand"><a href="http://localhost:3100" aria-label="Back to launcher"><ArrowLeft size={16} /></a><div><strong>Generative Decision Surface</strong><span>Interface assembled around the decision</span></div></div>
-        <StatusPill status={phase === 'generating' ? 'loading' : phase === 'complete' ? 'complete' : 'ready'}>{phase === 'generating' ? 'Composing decision instruments' : phase === 'complete' ? 'Surface is live' : 'Prompt ready'}</StatusPill>
+      <header className="workbench-header">
+        <div className="surface-brand"><Boxes size={16} /><b>DECISION SURFACE</b><span>/ generative interface runtime</span></div>
+        <nav><button className="active">WORKSPACE</button><button>PROVENANCE</button><button>MODEL</button></nav>
+        <div className="runtime-state"><i className={phase === 'complete' ? 'complete' : ''} />{phase === 'empty' ? 'IDLE' : phase.toUpperCase()}</div>
       </header>
 
-      <section className="surface-intro">
-        <div><Eyebrow>Not an answer · a decision environment</Eyebrow><h1>AI builds the interface <em>the decision needs.</em></h1></div>
-        <GlassCard className="prompt-object" intensity="clear">
-          <span>Decision request</span>
-          <p>“Compare three AI solution vendors on cost, security, accuracy, and field adoption difficulty.”</p>
-          <GlowButton onClick={generate} disabled={phase === 'generating'}>{phase === 'empty' ? 'Generate Surface' : 'Regenerate Surface'}</GlowButton>
-        </GlassCard>
+      <aside className="command-rail">
+        <div className="rail-mark">DS<br /><span>03</span></div>
+        <button onClick={generateSurface} title="Generate Surface"><WandSparkles size={17} /></button>
+        <button onClick={() => setCommandOpen((current) => !current)} className={commandOpen ? 'active' : ''} title="Commands"><Command size={17} /></button>
+        <button onClick={focusSecurity} className={focus === 'security' ? 'active' : ''} title="Focus on Security"><Focus size={17} /></button>
+        <span />
+        <button title="Search"><Search size={17} /></button>
+        <button title="System"><Cpu size={17} /></button>
+      </aside>
+
+      <section className="query-strip">
+        <div className="query-index">REQUEST<br /><b>#001</b></div>
+        <p>Compare three AI solution vendors by <u>cost</u>, <u>security</u>, <u>accuracy</u>, and <u>field adoption difficulty</u>.</p>
+        <button onClick={generateSurface} disabled={phase === 'planning' || phase === 'assembling'}><Play size={13} fill="currentColor" /> {phase === 'empty' ? 'GENERATE SURFACE' : 'REASSEMBLE'}</button>
       </section>
 
-      <div className="surface-toolbar">
-        <div><SlidersHorizontal size={13} /><span>Decision lens</span></div>
-        <button className={focus === 'security' ? 'active' : ''} onClick={() => setFocus(focus === 'security' ? null : 'security')}><LockKeyhole size={12} /> Focus on Security</button>
-        <span className="toolbar-note">Drag blocks to reorder · remove what you don’t need</span>
-      </div>
+      <section className="workspace-frame">
+        {phase === 'empty' ? (
+          <div className="blank-workspace">
+            <div className="origin-cross"><i /><i /><span>0,0</span></div>
+            <div className="blank-message"><Network size={25} /><span>NO INSTRUMENT GRAPH</span><h1>The interface will assemble around the decision.</h1><p>Run the request. The model will plan the minimum tools, connect their data dependencies, and keep only affected blocks live when inputs change.</p></div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.12, duration: reduced ? 0 : 550 }}
+            minZoom={0.45}
+            maxZoom={1.4}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background color="#c9ccd0" gap={20} size={1} />
+            <Controls position="bottom-left" showInteractive={false} />
+          </ReactFlow>
+        )}
 
-      {phase === 'empty' ? (
-        <GlassCard className="surface-empty">
-          <motion.div animate={{ rotate: [0, 6, -5, 0], scale: [1, 1.04, 1] }} transition={{ duration: 7, repeat: Infinity }}><WandSparkles size={38} /></motion.div>
-          <h2>The surface is intentionally empty.</h2>
-          <p>Generate once. The AI will stream in controls, comparisons, evidence, counterarguments, and a decision action as native interface blocks.</p>
-          <GlowButton onClick={generate}>Generate Surface</GlowButton>
-        </GlassCard>
-      ) : (
-        <LayoutGroup>
-          <section className={`decision-canvas ${focus ? `focus-${focus}` : ''}`}>
-            <AnimatePresence mode="popLayout">
-              {blocks.map((block, index) => (
-                <motion.article
-                  layout
-                  drag
-                  dragSnapToOrigin
-                  dragElastic={0.12}
-                  onDragEnd={(_, info) => {
-                    if (Math.abs(info.offset.y) > 60 || Math.abs(info.offset.x) > 90) shiftBlock(block, info.offset.y + info.offset.x > 0 ? 1 : -1);
-                  }}
-                  initial={{ opacity: 0, scale: .92, y: 24 }}
-                  animate={{ opacity: focus === 'security' && (block === 'risk' || block === 'weights' || block === 'vendors') ? 1 : focus === 'security' ? .52 : 1, scale: focus === 'security' && (block === 'risk' || block === 'weights' || block === 'vendors') ? 1.02 : 1, y: 0 }}
-                  exit={{ opacity: 0, scale: .9 }}
-                  transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-                  key={block}
-                  className={`surface-block block-${block} ${index === 0 ? 'block-first' : ''}`}
-                >
-                  <GlassCard className="block-glass" intensity={block === 'counter' ? 'contradictory' : block === 'rationale' ? 'clear' : 'soft'}>
-                    <div className="block-head"><span><Grip size={12} />{blockLabel(block)}</span><button onClick={() => removeBlock(block)} aria-label={`Remove ${blockLabel(block)}`}><Trash2 size={12} /></button></div>
-                    {renderBlock(block)}
-                    <div className="provenance"><Database size={10} /><span>Built from: request · vendor evidence · active controls</span></div>
-                  </GlassCard>
-                </motion.article>
-              ))}
-            </AnimatePresence>
-            {assembling ? (
-              <motion.div className="assembly-cursor" initial={{ opacity:0, scale:.8 }} animate={{ opacity:1, scale:1 }}><WandSparkles size={14} /><span>assembling {blockLabel(assembling).toLowerCase()}…</span></motion.div>
-            ) : null}
-          </section>
-        </LayoutGroup>
-      )}
+        {(phase === 'planning' || phase === 'assembling') ? (
+          <div className="assembly-trace">
+            <span><Activity size={11} /> LIVE ASSEMBLY</span>
+            <div>{log[0] ?? 'planning graph'}<i /></div>
+          </div>
+        ) : null}
+
+        <AnimatePresence>
+          {commandOpen ? (
+            <motion.div className="command-palette" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+              <div><Command size={13} /><input autoFocus placeholder="Run a surface command…" /></div>
+              <button onClick={focusSecurity}><ShieldCheck size={14} /><span>Focus on Security</span><kbd>↵</kbd></button>
+              <button onClick={() => useSurfaceStore.getState().setWeight('accuracy', 42)}><Gauge size={14} /><span>Prioritize Accuracy</span><kbd>⌘2</kbd></button>
+              <button onClick={generateSurface}><Sparkles size={14} /><span>Rebuild from request</span><kbd>⌘R</kbd></button>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </section>
+
+      <aside className="compute-log">
+        <div className="compute-title"><Database size={12} /> COMPUTATION LOG</div>
+        <div className="winner-readout"><span>LIVE RECOMMENDATION</span><strong>{scores[0].name}</strong><b>{scores[0].score}</b></div>
+        <div className="dependency-list">
+          <span>DEPENDENCIES</span>
+          <div><LockKeyhole size={11} /> security weight <b>{weights.security}</b></div>
+          <div><CircleDollarSign size={11} /> budget index <b>{budget}</b></div>
+          <div><ShieldCheck size={11} /> security focus <b>{focus ? 'ON' : 'OFF'}</b></div>
+        </div>
+        <div className="log-lines">{log.length ? log.map((line, index) => <p key={`${line}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span>{line}</p>) : <p><span>00</span>awaiting generation</p>}</div>
+      </aside>
+
+      <footer className="surface-footer"><span><SlidersHorizontal size={11} /> LIVE INPUTS RECOMPUTE DEPENDENT NODES ONLY</span><span><ArrowDown size={11} /> DRAG MODULES · DELETE MODULES · PAN WORKSPACE</span></footer>
     </main>
   );
 }
 
-function blockLabel(block: BlockType) {
-  return ({ vendors: 'Vendor comparison', weights: 'Evaluation criteria', cost: 'Cost control', risk: 'Risk profile', rationale: 'Recommendation rationale', counter: 'Challenge card', decision: 'Decision action' } as Record<BlockType, string>)[block];
+export function App() {
+  return <ReactFlowProvider><SurfaceWorkspace /></ReactFlowProvider>;
 }
