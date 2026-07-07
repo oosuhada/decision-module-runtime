@@ -43,6 +43,12 @@ button:focus-visible, input:focus-visible, .react-flow__node:focus-visible { out
 .workspace-frame .react-flow__controls-button { border-radius: 0; background: #fff; border-color: #d0d3d7; }
 .data-edge .react-flow__edge-path { stroke: #526476; stroke-width: 1.2; }
 .data-edge.react-flow__edge.animated path { stroke-dasharray: 3 5; }
+.surface-shell.low-power .react-flow__edge.animated path { animation: none !important; }
+.plan-edge .react-flow__edge-path { stroke: #adb3ba; stroke-width: 1; stroke-dasharray: 2 7; }
+.planned-slot { min-height: 118px; border: 1px dashed #939aa2; background: repeating-linear-gradient(135deg, rgba(255,255,255,.7), rgba(255,255,255,.7) 8px, rgba(232,235,238,.7) 8px, rgba(232,235,238,.7) 9px); display: grid; align-content: center; justify-items: center; gap: 5px; color: #737a82; }
+.planned-slot span, .planned-slot small { font: 7px 'DM Mono', monospace; letter-spacing: .1em; }
+.planned-slot strong { font: 500 12px 'Inter', sans-serif; color: #3e454c; }
+.planned-slot small { color: #9ca2a9; }
 .react-flow__handle.data-handle { width: 7px; height: 7px; border-radius: 0; border: 1px solid #6c747d; background: #f8f9fa; }
 
 .blank-workspace { position: absolute; inset: 0; background-image: linear-gradient(#d8dadd 1px, transparent 1px), linear-gradient(90deg, #d8dadd 1px, transparent 1px); background-size: 20px 20px; display: grid; place-items: center; }
@@ -135,6 +141,8 @@ button:focus-visible, input:focus-visible, .react-flow__node:focus-visible { out
 .dependency-list > span { font: 7px 'DM Mono', monospace; color: #858a90; }
 .dependency-list > div { margin-top: 8px; display: grid; grid-template-columns: 16px 1fr auto; gap: 5px; align-items: center; font: 8px 'DM Mono', monospace; }
 .dependency-list b { font-weight: 500; }
+.agent-readback { margin: 9px 11px 0; padding: 8px 9px; border: 1px solid #b9bec4; background: #f5f6f7; display: grid; grid-template-columns: 14px 1fr; gap: 6px; align-items: start; font: 7px/1.45 'DM Mono', monospace; color: #535a61; }
+.agent-readback svg { margin-top: 1px; }
 .log-lines { padding: 7px 11px; }
 .log-lines p { margin: 0; padding: 7px 0; border-bottom: 1px solid #d1d4d7; font: 7px/1.4 'DM Mono', monospace; color: #686e74; display: grid; grid-template-columns: 22px 1fr; gap: 4px; }
 .log-lines span { color: #a0a4a9; }

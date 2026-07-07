@@ -40,9 +40,10 @@ import {
   X,
 } from 'lucide-react';
 import { vendorEvidence } from './lib/mock-ai';
+import { createCanvasEvent, createSurfacePlan, describeCanvasEvent, getAffectedBlocks, type SurfaceBlockId } from './lib/generative-protocol';
 
 type Criterion = 'cost' | 'security' | 'accuracy' | 'adoption';
-type BlockType = 'brief' | 'weights' | 'vendors' | 'cost' | 'risk' | 'rationale' | 'counter' | 'decision';
+type BlockType = SurfaceBlockId;
 
 type SurfaceStore = {
   weights: Record<Criterion, number>;
@@ -96,7 +97,7 @@ function InstrumentShell({ title, code, children, emphasis = false }: { title: s
   );
 }
 
-function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; code: string }; id: string }) {
+function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; code: string; status?: 'planned' | 'mounted' }; id: string }) {
   const weights = useSurfaceStore((state) => state.weights);
   const budget = useSurfaceStore((state) => state.budget);
   const focus = useSurfaceStore((state) => state.focus);
@@ -105,6 +106,21 @@ function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; cod
   const scores = vendors.map((vendor) => ({ ...vendor, score: scoreVendor(vendor, weights, budget) })).sort((a, b) => b.score - a.score);
   const winner = scores[0];
   const emphasized = focus === 'security' && relatedToSecurity.includes(data.type);
+  const emitInputChange = (source: BlockType, detail: string) => {
+    window.dispatchEvent(new CustomEvent('surface:input', { detail: { source, detail } }));
+  };
+
+  if (data.status === 'planned') {
+    return (
+      <div className="planned-slot" aria-label={`${data.title} planned slot`}>
+        <Handle type="target" position={Position.Left} className="data-handle" />
+        <span>{data.code}</span>
+        <strong>{data.title}</strong>
+        <small>AWAITING INSTRUMENT</small>
+        <Handle type="source" position={Position.Right} className="data-handle" />
+      </div>
+    );
+  }
 
   const body = (() => {
     switch (data.type) {
@@ -114,7 +130,7 @@ function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; cod
         return (
           <div className="weight-stack nodrag nowheel">
             {(Object.keys(weights) as Criterion[]).map((criterion) => (
-              <label key={criterion}><span>{criterion}</span><input type="range" min="5" max="60" value={weights[criterion]} onChange={(event) => setWeight(criterion, Number(event.target.value))} /><b>{weights[criterion]}</b></label>
+              <label key={criterion}><span>{criterion}</span><input type="range" min="5" max="60" value={weights[criterion]} onChange={(event) => { const value = Number(event.target.value); setWeight(criterion, value); emitInputChange('weights', `${criterion}=${value}`); }} /><b>{weights[criterion]}</b></label>
             ))}
           </div>
         );
@@ -126,7 +142,7 @@ function SurfaceNode({ data, id }: { data: { type: BlockType; title: string; cod
           </div>
         );
       case 'cost':
-        return <div className="cost-control nodrag nowheel"><div><CircleDollarSign size={17} /><span>MAX INTEGRATION INDEX</span><strong>{budget}</strong></div><input type="range" min="45" max="95" value={budget} onChange={(event) => setBudget(Number(event.target.value))} /><small>Changing this constraint recalculates only dependent blocks.</small></div>;
+        return <div className="cost-control nodrag nowheel"><div><CircleDollarSign size={17} /><span>MAX INTEGRATION INDEX</span><strong>{budget}</strong></div><input type="range" min="45" max="95" value={budget} onChange={(event) => { const value = Number(event.target.value); setBudget(value); emitInputChange('cost', `budget=${value}`); }} /><small>Changing this constraint recalculates only dependent blocks.</small></div>;
       case 'risk':
         return (
           <div className="risk-bars">
@@ -158,23 +174,37 @@ const nodeTypes = { instrument: SurfaceNode };
 
 function SurfaceWorkspace() {
   const reduced = Boolean(useReducedMotion());
+  const lowPower = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const device = navigator as Navigator & { deviceMemory?: number };
+    return (device.hardwareConcurrency > 0 && device.hardwareConcurrency <= 4) || Boolean(device.deviceMemory && device.deviceMemory <= 4);
+  }, []);
+  const quietMotion = reduced || lowPower;
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [phase, setPhase] = useState<'empty' | 'planning' | 'assembling' | 'complete'>('empty');
   const [log, setLog] = useState<string[]>([]);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [agentReadback, setAgentReadback] = useState('canvas state not yet sampled');
   const focus = useSurfaceStore((state) => state.focus);
   const setFocus = useSurfaceStore((state) => state.setFocus);
   const weights = useSurfaceStore((state) => state.weights);
   const budget = useSurfaceStore((state) => state.budget);
 
   const scores = useMemo(() => vendors.map((vendor) => ({ ...vendor, score: scoreVendor(vendor, weights, budget) })).sort((a, b) => b.score - a.score), [weights, budget]);
+  const surfacePlan = useMemo(() => createSurfacePlan(blockDefinitions), []);
+
+  const recordCanvasEvent = useCallback((event: ReturnType<typeof createCanvasEvent>) => {
+    const description = describeCanvasEvent(event);
+    setLog((current) => [description, ...current].slice(0, 6));
+    setAgentReadback(`agent readback · ${description}`);
+  }, []);
 
   const deleteNode = useCallback((id: string) => {
     setNodes((current) => current.filter((node) => node.id !== id));
     setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id));
-    setLog((current) => [`removed ${id}`, ...current].slice(0, 6));
-  }, [setEdges, setNodes]);
+    recordCanvasEvent(createCanvasEvent({ type: 'node-removed', nodeId: id as BlockType, detail: 'human edited generated surface' }));
+  }, [recordCanvasEvent, setEdges, setNodes]);
 
   useEffect(() => {
     const listener = (event: Event) => deleteNode((event as CustomEvent<string>).detail);
@@ -182,32 +212,54 @@ function SurfaceWorkspace() {
     return () => window.removeEventListener('surface:delete', listener);
   }, [deleteNode]);
 
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const detail = (event as CustomEvent<{ source: BlockType; detail: string }>).detail;
+      const affected = getAffectedBlocks(detail.source);
+      recordCanvasEvent(createCanvasEvent({ type: 'input-changed', nodeId: detail.source, detail: `${detail.detail}; recompute ${affected.join(' → ')}` }));
+    };
+    window.addEventListener('surface:input', listener);
+    return () => window.removeEventListener('surface:input', listener);
+  }, [recordCanvasEvent]);
+
   const generateSurface = async () => {
     setNodes([]);
     setEdges([]);
     setLog(['parsed decision request', 'identified 4 evaluation criteria', 'planning instrument graph']);
     setPhase('planning');
-    if (!reduced) await new Promise((resolve) => window.setTimeout(resolve, 430));
+    setNodes(surfacePlan.map((item) => ({
+      id: item.id,
+      type: 'instrument',
+      position: item.position,
+      data: { type: item.id, title: item.title, code: item.code, status: 'planned' },
+      style: { width: item.width },
+      draggable: false,
+    })));
+    setEdges(surfacePlan.flatMap((item) => item.inputs.map((source, edgeIndex) => ({
+      id: `plan-${source}-${item.id}-${edgeIndex}`,
+      source,
+      target: item.id,
+      className: 'plan-edge',
+    }))));
+    if (!quietMotion) await new Promise((resolve) => window.setTimeout(resolve, 430));
     setPhase('assembling');
 
-    for (let index = 0; index < blockDefinitions.length; index += 1) {
-      if (!reduced) await new Promise((resolve) => window.setTimeout(resolve, 145));
-      const block = blockDefinitions[index];
+    for (let index = 0; index < surfacePlan.length; index += 1) {
+      if (!quietMotion) await new Promise((resolve) => window.setTimeout(resolve, 145));
+      const block = surfacePlan[index];
       const node: Node = {
-        id: block.type,
+        id: block.id,
         type: 'instrument',
         position: block.position,
-        data: { type: block.type, title: block.title, code: `M-${String(index + 1).padStart(2, '0')}` },
-        style: { width: block.type === 'vendors' ? 330 : block.type === 'rationale' ? 300 : 280 },
+        data: { type: block.id, title: block.title, code: block.code, status: 'mounted' },
+        style: { width: block.width },
       };
-      setNodes((current) => [...current, node]);
-      setLog((current) => [`mounted ${block.type} instrument`, ...current].slice(0, 6));
-
-      const edgeMap: Partial<Record<BlockType, BlockType[]>> = {
-        weights: ['brief'], vendors: ['weights'], cost: ['brief'], risk: ['vendors'], rationale: ['vendors', 'risk', 'cost'], counter: ['weights', 'rationale'], decision: ['rationale', 'counter'],
-      };
-      const inputs = edgeMap[block.type] ?? [];
-      setEdges((current) => [...current, ...inputs.map((source, edgeIndex) => ({ id: `${source}-${block.type}-${edgeIndex}`, source, target: block.type, animated: !reduced, markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 }, className: 'data-edge' }))]);
+      setNodes((current) => current.map((currentNode) => currentNode.id === block.id ? node : currentNode));
+      setEdges((current) => [
+        ...current.filter((edge) => edge.target !== block.id),
+        ...block.inputs.map((source, edgeIndex) => ({ id: `${source}-${block.id}-${edgeIndex}`, source, target: block.id, animated: !quietMotion, markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 }, className: 'data-edge' })),
+      ]);
+      recordCanvasEvent(createCanvasEvent({ type: 'node-mounted', nodeId: block.id, detail: `streamed instrument ${index + 1}/${surfacePlan.length}` }));
     }
     setPhase('complete');
     setLog((current) => ['surface ready / dependencies live', ...current].slice(0, 6));
@@ -227,10 +279,11 @@ function SurfaceWorkspace() {
       return { ...node, position: { x: 1120 + (node.position.y % 280), y: 80 + node.position.y * .55 } };
     }));
     setLog((current) => [`${nextFocus ? 'focused' : 'released'} security dependency graph`, ...current].slice(0, 6));
+    recordCanvasEvent(createCanvasEvent({ type: 'focus-changed', detail: nextFocus ? 'security dependency graph prioritized' : 'all dependencies restored' }));
   };
 
   return (
-    <main className="surface-shell">
+    <main className={`surface-shell ${lowPower ? 'low-power' : ''}`}>
       <header className="workbench-header">
         <div className="surface-brand"><Boxes size={16} /><b>DECISION SURFACE</b><span>/ generative interface runtime</span></div>
         <nav><button className="active">WORKSPACE</button><button>PROVENANCE</button><button>MODEL</button></nav>
@@ -266,8 +319,9 @@ function SurfaceWorkspace() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
+            onNodeDragStop={(_, node) => recordCanvasEvent(createCanvasEvent({ type: 'node-moved', nodeId: node.id as BlockType, detail: `position ${Math.round(node.position.x)},${Math.round(node.position.y)}` }))}
             fitView
-            fitViewOptions={{ padding: 0.12, duration: reduced ? 0 : 550 }}
+            fitViewOptions={{ padding: 0.12, duration: quietMotion ? 0 : 550 }}
             minZoom={0.45}
             maxZoom={1.4}
             proOptions={{ hideAttribution: true }}
@@ -305,6 +359,7 @@ function SurfaceWorkspace() {
           <div><CircleDollarSign size={11} /> budget index <b>{budget}</b></div>
           <div><ShieldCheck size={11} /> security focus <b>{focus ? 'ON' : 'OFF'}</b></div>
         </div>
+        <div className="agent-readback"><Cpu size={11} /><span>{agentReadback}</span></div>
         <div className="log-lines">{log.length ? log.map((line, index) => <p key={`${line}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span>{line}</p>) : <p><span>00</span>awaiting generation</p>}</div>
       </aside>
 
