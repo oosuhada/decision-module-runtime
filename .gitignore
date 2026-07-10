@@ -6,5 +6,9 @@ dist
 .env
 .env.*
 !.env.example
+.venv
+backend/*.db
+backend/.pytest_cache
+backend/**/__pycache__
 playwright-report
 test-results
