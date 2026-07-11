@@ -1,6 +1,6 @@
 # Credits and licenses
 
-Generative Decision Surface uses open-source libraries as infrastructure; its module system, visual language, and decision-flow design are original to this prototype.
+Generative Decision Workspace uses open-source libraries as infrastructure; its module SDK, protocol, deterministic runtime, security boundary, visual language, and decision-flow design are original to this repository.
 
 ## React Flow / xyflow
 - Repository: https://github.com/xyflow/xyflow
@@ -12,12 +12,12 @@ Generative Decision Surface uses open-source libraries as infrastructure; its mo
 - Repository: https://github.com/pmndrs/zustand
 - Steward: Poimandres / pmndrs contributors
 - License: MIT
-- Use: live decision criteria, budget, and focus state shared by generated instruments.
+- Use: validated workspace state, undo/redo history, snapshots, focus, and mobile workspace modes.
 
 ## Motion
 - Repository: https://github.com/motiondivision/motion
 - License: MIT
-- Use: command palette and generated-state transitions.
+- Use: reduced-motion aware UI behavior and generated-state transitions.
 
 ## Lucide
 - Repository: https://github.com/lucide-icons/lucide
@@ -30,13 +30,13 @@ No code was copied from v0, Framer Marketplace, or HTML-in-Canvas. Those product
 - Repository: https://github.com/CopilotKit/OpenGenerativeUI
 - Steward: CopilotKit contributors
 - License: MIT
-- Use: architecture reference for visible plan → stream → render stages. The implementation in `src/lib/generative-protocol.ts` is project-specific and not a verbatim source copy.
+- Use: architecture reference for visible plan → approve → stream → validated render stages. The implementation in `src/protocol/`, `src/agent/`, and `src/runtime/` is project-specific and not a verbatim source copy.
 
 ## genui-canvas
 - Repository: https://github.com/LuisErlacher/genui-canvas
 - Author: Luis Erlacher and contributors
 - License: MIT
-- Use: architecture reference for bidirectional agent/canvas state. Human edits are translated into local typed canvas events and agent readback.
+- Use: architecture reference for bidirectional agent/canvas state. Human edits use typed store commands and audit events; no `window` `CustomEvent` transport remains.
 
 ## Onlook
 - Repository: https://github.com/onlook-dev/onlook
