@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: decision_workspace
+      POSTGRES_USER: decision_workspace
+      POSTGRES_PASSWORD: local-development-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decision_workspace"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - decision_workspace_pg:/var/lib/postgresql/data
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://decision_workspace:local-development-only@postgres:5432/decision_workspace
+      PUBLIC_BASE_URL: http://localhost:3103
+      DECISION_REQUIRE_AUTH: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8103:8103"
+
+volumes:
+  decision_workspace_pg:
