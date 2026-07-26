@@ -9,21 +9,21 @@ export type AgentProvider = {
 };
 
 const vendors = [
-  { name: 'Helix', cost: 76, security: 94, accuracy: 91, adoption: 67 },
-  { name: 'Northstar', cost: 91, security: 84, accuracy: 88, adoption: 93 },
-  { name: 'Veridian', cost: 58, security: 91, accuracy: 96, adoption: 62 },
+  { name: 'Vendor A', cost: 76, security: 94, accuracy: 91, adoption: 67 },
+  { name: 'Vendor B', cost: 91, security: 84, accuracy: 88, adoption: 93 },
+  { name: 'Vendor C', cost: 58, security: 91, accuracy: 96, adoption: 62 },
 ];
 
 const evidence = [
-  { id: 'req-1', source: 'Decision request', note: 'Compare AI vendors on cost, security, accuracy and adoption difficulty.' },
-  { id: 'bench-1', source: 'Benchmark fixture', note: 'Accuracy metrics are deterministic demo inputs.' },
-  { id: 'sec-1', source: 'Security fixture', note: 'Security scores represent normalized review evidence.' },
+  { id: 'req-1', source: 'Decision request', note: 'Compare hypothetical AI vendors using synthetic reference inputs.' },
+  { id: 'bench-1', source: 'Synthetic benchmark fixture', note: 'Accuracy metrics are deterministic reference inputs, not observed vendor measurements.' },
+  { id: 'sec-1', source: 'Synthetic security fixture', note: 'Security scores are normalized reference values, not claims about real vendors.' },
 ];
 
 const sources = [
-  { id: 'source-01', label: 'Security review fixture', locator: 'fixture://vendor-security-v1' },
-  { id: 'source-02', label: 'Accuracy benchmark fixture', locator: 'fixture://accuracy-benchmark-v1' },
-  { id: 'source-03', label: 'Adoption interview fixture', locator: 'fixture://field-adoption-v1' },
+  { id: 'source-01', label: 'Synthetic security review', locator: 'synthetic://vendor-security-v1' },
+  { id: 'source-02', label: 'Synthetic accuracy benchmark', locator: 'synthetic://accuracy-benchmark-v1' },
+  { id: 'source-03', label: 'Synthetic adoption interviews', locator: 'synthetic://field-adoption-v1' },
 ];
 
 function item(id: string, type: ModuleType, title: string, purpose: string, x: number, y: number, dependencies: string[], input: Record<string, unknown>): PlanItem {
@@ -86,7 +86,7 @@ function createModule(planItem: PlanItem, runId: string): ModuleInstance {
 }
 
 export const deterministicProvider: AgentProvider = {
-  id: 'deterministic-demo',
+  id: 'local-reference',
   async plan(request, signal) {
     await delay(120, signal);
     return {
@@ -96,7 +96,7 @@ export const deterministicProvider: AgentProvider = {
       status: 'draft',
       items: planItems(request),
       missingInputs: ['Production pricing evidence', 'Observed field adoption time'],
-      assumptions: ['Scores are normalized 0–100 fixture values.', 'Budget index is a constraint, not a currency amount.'],
+      assumptions: ['All built-in vendor scores are synthetic 0–100 reference values.', 'Budget index is a constraint, not a currency amount.'],
       computeNotes: ['All scoring and risk calculations run in deterministic registry modules.', 'Only downstream modules recompute after input changes.'],
     };
   },

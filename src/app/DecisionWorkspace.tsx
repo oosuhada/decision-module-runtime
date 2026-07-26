@@ -29,7 +29,7 @@ import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/worksp
 import { copyReadonlyShareUrl, downloadWorkspaceExport } from '../workspaces/export';
 import { useWorkspaceStore } from '../workspaces/store';
 
-const DEFAULT_REQUEST = 'Compare three AI solution vendors by cost, security, accuracy, and field adoption difficulty.';
+const DEFAULT_REQUEST = 'Compare three hypothetical AI solution vendors using synthetic cost, security, accuracy, and adoption inputs.';
 
 function useLowPower() {
   return useMemo(() => {
@@ -205,7 +205,7 @@ export function DecisionWorkspace() {
   return (
     <main className={`surface-shell ${lowPower ? 'low-power' : ''}`}>
       <header className="workbench-header">
-        <div className="surface-brand"><Boxes size={16} /><b>GENERATIVE DECISION WORKSPACE</b><span>/ safe module runtime</span></div>
+        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ validated runtime</span></div>
         <nav aria-label="Workspace views">
           <button className={viewMode === 'canvas' ? 'active' : ''} onClick={() => setViewMode('canvas')}>CANVAS</button>
           <button className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}><ListTree size={12} /> LIST/TREE</button>
@@ -239,7 +239,7 @@ export function DecisionWorkspace() {
         {!workspace.modules.length && !workspace.plan ? (
           <div className="blank-workspace">
             <div className="origin-cross"><i /><i /><span>0,0</span></div>
-            <div className="blank-message"><Network size={25} /><span>NO EXECUTABLE GRAPH</span><h1>The agent plans first. You approve before anything assembles.</h1><p>Only registered modules can enter the main application. Their inputs and outputs are validated, computation stays deterministic, and every human edit is undoable and saved.</p><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN THIS DECISION</button></div>
+            <div className="blank-message"><Network size={25} /><span>NO EXECUTABLE GRAPH</span><h1>Plan the decision structure, then approve what enters the runtime.</h1><p>The local reference planner is deterministic. Only registered modules can enter the application; inputs and outputs are validated, computation stays deterministic, and every human edit remains undoable and saved.</p><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN THIS DECISION</button></div>
           </div>
         ) : null}
         {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}

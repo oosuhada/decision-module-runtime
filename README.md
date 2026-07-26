@@ -1,150 +1,104 @@
-# Generative Decision Workspace
+# Decision Module Runtime
 
-**A safe generative interface that assembles itself around a human decision.** The workspace starts with a request, asks an agent/provider for a structured plan, requires human approval, then assembles a validated dependency graph of deterministic decision modules.
+Decision Module Runtime is a full-stack workbench for assembling an auditable decision graph from validated modules, deterministic calculations, provenance, and an explicit human decision gate.
 
-This repository is intentionally **not** a chatbot with a generated preview. The UI itself is the decision artifact: modules have explicit inputs, outputs, dependencies, formulas, provenance, versions, stale/error state, and a final human decision gate.
+The project began as an interaction experiment called **Generative Decision Surface**. The current implementation treats generated planning as an adapter around a closed runtime rather than allowing an AI model to create arbitrary trusted UI or calculation logic.
 
-## Production flow
+## Problem
+
+AI-generated interfaces can look convincing while hiding where numbers came from, which dependencies changed, or whether the model invented a calculation. This project explores a stricter alternative: an agent may propose a plan, but only registered modules with known schemas, renderers, formulas, and dependency semantics can enter the trusted workspace.
+
+## Working flow
 
 ```text
-Request
-→ Plan
-→ Human plan edit / approval
-→ Structured action stream
-→ Schema-validated module assembly
-→ Connect dependencies
-→ Deterministic compute
-→ Edit inputs
-→ Recompute affected graph
-→ Inspect provenance / versions
-→ Record human decision
-→ Share / export
-→ Refresh and restore exact state
+Write a decision request
+→ generate or load a module plan
+→ review the plan
+→ approve or reject it
+→ assemble registered modules
+→ connect dependencies
+→ compute deterministically
+→ edit human-owned inputs
+→ recompute affected modules
+→ inspect provenance and audit history
+→ snapshot / compare / branch
+→ record a human decision
+→ export or share read-only
 ```
 
-![Production assembly flow](./public/production-flow.gif)
+## What is implemented
 
-## Before / after
+- Closed module registry with versioned input/output contracts.
+- Zod validation for plans, protocol actions, workspace documents, and module data.
+- DAG validation with cycle rejection.
+- Deterministic downstream recomputation and stale/error state propagation.
+- Human review before a planned graph is assembled.
+- Undo/redo, named snapshots, restore, compare, and branch workflows.
+- Module-level provenance and workspace audit history.
+- Human decision gate separate from system recommendation.
+- IndexedDB persistence with FastAPI synchronization.
+- Frozen read-only share snapshots and JSON export.
+- Accessible list/tree representation alongside the spatial canvas.
+- Mobile module stack, focused module, dependency path, and decision summary modes.
+- Sandboxed experimental preview boundary for untrusted HTML/JavaScript experiments.
 
-### Desktop
+## Reference data honesty
 
-Prototype — fixed mock assembly with transient state:
+The built-in vendor example is explicitly **synthetic reference data**. Vendor names, benchmark scores, security reviews, and adoption evidence are placeholders for exercising the runtime. They do not represent real companies or measured outcomes.
 
-![Prototype desktop](./public/preview.png)
+The local reference provider uses a deterministic plan so the complete runtime can be explored without model credentials. An external provider can be connected at the planning boundary, but it still cannot bypass the registered module contracts or become the source of numeric truth.
 
-Production workspace — approval, validated graph, real runtime log, persistence and provenance:
+## Runtime boundary
 
-![Production desktop](./public/production-desktop.png)
+The trusted application never renders arbitrary model-authored React code.
 
-### Mobile
+An agent/provider can propose structured actions. The dispatcher validates protocol version, sequence, idempotency, module type, dependencies, and schema before state changes are committed. Calculations run inside registered deterministic module implementations.
 
-Prototype — desktop workstation compressed into a narrow viewport:
+This means the generative layer can change the shape of the workspace without changing the rules that make the workspace trustworthy.
 
-![Prototype mobile](./public/preview-mobile.png)
+## Architecture
 
-Production mobile — readable Module Stack with Focus, Dependency Path and Decision Summary modes:
+```text
+src/
+  agent/          planning-provider boundary and approval UI
+  protocol/       structured runtime actions
+  runtime/        dispatcher and dependency graph
+  modules/        closed module registry and renderers
+  provenance/     audit/provenance inspection
+  persistence/    IndexedDB persistence
+  canvas/         spatial and accessible workspace views
+  sandbox/        isolated experimental preview boundary
+  workspaces/     state, snapshots, export, branching
 
-![Production mobile](./public/production-mobile.png)
-
-## Safety architecture
-
-- **Closed Module SDK** — only the 11 registered module types can render in the trusted React tree.
-- **Versioned protocol** — every agent action has protocol version, run id, exact sequence and idempotency id, and is validated with Zod.
-- **Deterministic computation** — LLM output is not computation truth; module formulas run locally against validated inputs and dependency outputs.
-- **DAG enforcement** — cyclic dependencies are rejected before commit.
-- **Human / agent separation** — audit events preserve actor identity. Recommendation and human choice are different fields.
-- **Undo / redo and snapshots** — human graph/input/decision edits are reversible; named snapshots can restore, compare and branch.
-- **Local-first persistence** — IndexedDB exact restore with FastAPI/database synchronization.
-- **Frozen read-only shares** — server-created share tokens point to immutable read-only workspace snapshots.
-- **Sandbox boundary** — experimental HTML/JavaScript is restricted to an opaque `sandbox="allow-scripts"` iframe with deny-by-default CSP, no same-origin access, bounded source/messages and a watchdog.
-- **Provider data minimization** — raw source locators, module payloads, audit details, snapshots and human rationale are excluded from the default provider context.
-- **Cancel / retry / timeout** — generation has abort propagation, retry with a fresh run id, partial-state preservation and a remote-provider timeout.
-
-Architecture and threat-model details:
-
-- [`docs/production-architecture.md`](docs/production-architecture.md)
-- [`docs/generative-protocol.md`](docs/generative-protocol.md)
-- [`docs/module-sdk.md`](docs/module-sdk.md)
-- [`docs/security-model.md`](docs/security-model.md)
-- [`docs/state-machine.md`](docs/state-machine.md)
-- [`docs/reference-adoption.md`](docs/reference-adoption.md)
-
-## Module SDK v1
-
-The allowed registry contains:
-
-`text-evidence` · `criteria-weights` · `vendor-matrix` · `cost-model` · `risk-matrix` · `scenario-comparison` · `chart` · `counter-case` · `recommendation-logic` · `human-decision-gate` · `source-ledger`
-
-Every contract carries a version, Zod input/output schema, dependency semantics, deterministic compute function, trusted renderer, validation rules, status/provenance fields and an accessibility summary.
-
-## Desktop and accessible views
-
-Desktop keeps the xyflow spatial workspace so topology and positions remain visible. A complete **List / Tree** view orders the same modules topologically, summarizes every dependency edge in text, exposes the same editable controls, and allows a decision to be completed without using the canvas or drag interactions.
-
-## Mobile redesign
-
-At 760 px and below the desktop canvas is no longer shrunk to fit. The primary UI becomes:
-
-1. **Module Stack** — default readable workflow.
-2. **Focused Module** — one module with previous/next controls.
-3. **Dependency Path** — breadcrumb plus ancestor path.
-4. **Decision Summary** — recommendation, counter-case, uncertainty and human rationale.
-
-Mobile body content uses 16 px or larger for the primary reading surfaces, command controls meet the 44 px touch target, the inspector becomes a bottom sheet, safe-area padding is honored, and the command input stays above the fixed mobile controls.
-
-## Persistence backend
-
-The browser works immediately with IndexedDB. The API provides cross-session/database persistence and frozen share snapshots.
-
-### Local API without external credentials
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
-PYTHONPATH=backend .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8103
+backend/
+  app/            persistence/share API
+  migrations/     database schema history
 ```
 
-The zero-credential development fallback uses SQLite. The web dev server proxies `/api` to port `8103`.
+## Design decisions
 
-### PostgreSQL production topology
+**Why a closed module registry?** The goal is composability without giving generated output authority to invent trusted code paths.
 
-```bash
-docker compose up --build
-```
+**Why deterministic reference planning?** It keeps the runtime inspectable and usable without credentials. Provider integration is replaceable; the runtime is the project.
 
-The Compose topology uses PostgreSQL 17 and the same SQLAlchemy/Alembic model. Initial migration: `74e3ca148483_initial_production_workspace_schema.py`.
+**Why keep a canvas?** Dependency topology is useful spatially, but a complete list/tree view exposes the same state for accessibility, inspection, and non-spatial workflows.
 
-Before internet exposure, terminate TLS and authenticated sessions at a trusted ingress/OIDC layer or enable the API write-auth boundary documented in [`docs/security-model.md`](docs/security-model.md). No production credential belongs in the frontend bundle.
-
-## Run the web workspace
+## Local development
 
 ```bash
 corepack pnpm install
+docker compose up -d
 corepack pnpm dev
 ```
 
-Open `http://localhost:3103/w/vendor-evaluation`.
+Default web address: `http://localhost:3103/w/vendor-evaluation`
 
-## Quality gates
+The deployed instance is linked from the repository homepage.
 
-```bash
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm test
-corepack pnpm build
-corepack pnpm exec playwright test
+## Project status
 
-PYTHONPATH=backend .venv/bin/pytest -q backend/tests
+This is a working full-stack reference implementation for constrained generative interfaces and auditable decision tooling. It is not presented as a mature autonomous agent platform. Real organizational deployment would require authentication, authorization, provider governance, secrets management, operational monitoring, and domain-specific module review.
 
-cd backend
-DATABASE_URL=sqlite:////tmp/decision-workspace-migration.db \
-  PYTHONPATH=. ../.venv/bin/alembic upgrade head
-```
+## Credits
 
-Coverage includes protocol parsing/malformed actions, idempotency and sequencing, graph cycles, deterministic module compute, stale propagation, partial failure, abort/timeout, undo/redo, snapshot restore, agent-context minimization, sandbox isolation, persistence/refresh, read-only share, desktop canvas, plan edit/approval, mobile stack modes, keyboard/list-tree alternative, human decision, and export.
-
-## Reference adoption and licenses
-
-The project keeps the original visual identity: bright technical workstation, strict grid, square instruments, visible ports/dependencies and fast spatial changes. The architecture adapts ideas from MIT-licensed OpenGenerativeUI and genui-canvas while retaining xyflow as the actual spatial editor. Onlook and Graphite informed editor information architecture only.
-
-See [`CREDITS.md`](CREDITS.md) and [`docs/reference-adoption.md`](docs/reference-adoption.md). No unknown-license code is included.
+Third-party libraries and visual references are documented in [`CREDITS.md`](CREDITS.md) and the supporting `docs/` notes.

@@ -1,5 +1,5 @@
 {
-  "name": "generative-decision-surface",
+  "name": "decision-module-runtime",
   "private": true,
   "version": "0.1.0",
   "type": "module",

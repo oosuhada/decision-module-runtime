@@ -192,7 +192,7 @@ const registryEntries: ModuleContract[] = [
       const recommendation = firstDependency(context, (value) => 'recommendation' in value);
       const current = String(recommendation.recommendation ?? 'the current leader');
       return {
-        counterCase: `If field adoption becomes the dominant criterion, Northstar can overtake ${current}.`,
+        counterCase: `If field adoption becomes the dominant criterion, Vendor B can overtake ${current}.`,
         uncertainty: 'Vendor metrics are benchmark inputs, not observed production outcomes.',
       };
     },

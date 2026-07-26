@@ -165,7 +165,7 @@ export function createEmptyWorkspace(id: string, request: string): WorkspaceDocu
     plan: null,
     run: {
       id: crypto.randomUUID(),
-      provider: 'deterministic-demo',
+      provider: 'local-reference',
       status: 'idle',
       startedAt: null,
       finishedAt: null,
