@@ -33,6 +33,7 @@ Write a decision request
 - DAG validation with cycle rejection.
 - Deterministic downstream recomputation and stale/error state propagation.
 - Human review before a planned graph is assembled.
+- Editable reference evidence, provenance locators, option names, and normalized option metrics so the built-in synthetic fixture can be replaced in-place with reviewed user inputs.
 - Undo/redo, named snapshots, restore, compare, and branch workflows.
 - Module-level provenance and workspace audit history.
 - Human decision gate separate from system recommendation.
