@@ -23,6 +23,7 @@ import { PlanApproval } from '../agent/PlanApproval';
 import { AccessibleDecisionTree } from '../canvas/AccessibleDecisionTree';
 import { DecisionCanvas } from '../canvas/DecisionCanvas';
 import { MobileWorkspace } from '../canvas/MobileWorkspace';
+import { RuntimeGuide } from '../components/RuntimeGuide';
 import { Inspector } from '../provenance/Inspector';
 import { branchWorkspaceUrl, ensureWorkspaceUrl, resolveWorkspaceRoute } from '../routes/workspaceRoute';
 import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/workspace';
@@ -82,6 +83,8 @@ export function DecisionWorkspace() {
   const [viewMode, setViewMode] = useState<'canvas' | 'tree'>('canvas');
   const [statusMessage, setStatusMessage] = useState('Ready');
   const [shareState, setShareState] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -156,6 +159,37 @@ export function DecisionWorkspace() {
     void assemble(false);
   };
 
+  const loadGuidedDemo = async () => {
+    const current = useWorkspaceStore.getState().workspace;
+    if (!current || current.mode === 'readonly' || planning) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setPlanning(true);
+    setStatusMessage('Loading editable reference graph…');
+    try {
+      const plan = await deterministicProvider.plan(DEFAULT_REQUEST, controller.signal);
+      const next = structuredClone(useWorkspaceStore.getState().workspace!);
+      next.request = DEFAULT_REQUEST;
+      replaceWorkspace(workspaceDocumentSchema.parse(next));
+      setRequestDraft(DEFAULT_REQUEST);
+      setPlan(plan);
+      approvePlan();
+      setPlanning(false);
+      await assemble(false);
+      setGuideStep(0);
+      setGuideOpen(true);
+      focusModule('evidence');
+      setInspectorOpen(true);
+      setStatusMessage('Guided reference graph ready · replace synthetic inputs with your own');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') setStatusMessage('Guided demo cancelled');
+      else setStatusMessage(error instanceof Error ? error.message : 'Could not load guided demo');
+    } finally {
+      setPlanning(false);
+    }
+  };
+
   const rejectPlan = () => {
     if (!workspace) return;
     const next = structuredClone(workspace);
@@ -205,7 +239,7 @@ export function DecisionWorkspace() {
   return (
     <main className={`surface-shell ${lowPower ? 'low-power' : ''}`}>
       <header className="workbench-header">
-        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ validated runtime</span></div>
+        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ validated runtime</span><button className="runtime-guide-trigger" type="button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>HOW TO USE</button></div>
         <nav aria-label="Workspace views">
           <button className={viewMode === 'canvas' ? 'active' : ''} onClick={() => setViewMode('canvas')}>CANVAS</button>
           <button className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}><ListTree size={12} /> LIST/TREE</button>
@@ -239,7 +273,7 @@ export function DecisionWorkspace() {
         {!workspace.modules.length && !workspace.plan ? (
           <div className="blank-workspace">
             <div className="origin-cross"><i /><i /><span>0,0</span></div>
-            <div className="blank-message"><Network size={25} /><span>NO EXECUTABLE GRAPH</span><h1>Plan the decision structure, then approve what enters the runtime.</h1><p>The local reference planner is deterministic. Only registered modules can enter the application; inputs and outputs are validated, computation stays deterministic, and every human edit remains undoable and saved.</p><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN THIS DECISION</button></div>
+            <div className="blank-message"><Network size={25} /><span>QUICK START / NO EXECUTABLE GRAPH</span><h1>Build your own graph, or load a working one first.</h1><p>The local reference planner is deterministic. Only registered modules can enter the application; inputs and outputs are validated, computation stays deterministic, and every human edit remains undoable and saved.</p><div className="blank-actions"><button className="primary" disabled={isReadonly || isRunning} onClick={() => void loadGuidedDemo()}><Play size={13} fill="currentColor" /> LOAD GUIDED DEMO</button><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN CURRENT REQUEST</button></div><small>The guided demo uses synthetic vendors and evidence, then shows exactly where to replace them with your own inputs.</small></div>
           </div>
         ) : null}
         {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}
@@ -273,6 +307,8 @@ export function DecisionWorkspace() {
         compareSnapshotId={compareSnapshotId}
         onBranch={branchFromSnapshot}
       />
+
+      {guideOpen && workspace.modules.length ? <RuntimeGuide step={guideStep} onStep={setGuideStep} onClose={() => setGuideOpen(false)} onFocus={(moduleId) => { focusModule(moduleId); setInspectorOpen(true); }} /> : null}
 
       <footer className="surface-footer"><span>SCHEMA-VALIDATED MODULES · DETERMINISTIC COMPUTE · HUMAN DECISION</span><span>{isReadonly ? 'READ-ONLY SHARE' : `UNDO ${past.length} · REDO ${future.length}`} · {quietMotion ? 'QUIET MOTION' : 'FULL MOTION'}</span></footer>
     </main>

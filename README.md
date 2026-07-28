@@ -42,6 +42,7 @@ Write a decision request
 - Accessible list/tree representation alongside the spatial canvas.
 - Mobile module stack, focused module, dependency path, and decision summary modes.
 - Sandboxed experimental preview boundary for untrusted HTML/JavaScript experiments.
+- Guided working graph that auto-assembles the editable synthetic reference case and walks through evidence replacement, option inputs, recommendation provenance, and the human decision gate.
 
 ## Reference data honesty
 
