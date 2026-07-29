@@ -4,11 +4,11 @@
 
 | Reference | License | Files/feature used | Changes made | Credit location |
 |---|---|---|---|---|
-| xyflow / React Flow | MIT | `src/App.tsx` spatial workspace | Editable generated instruments, ports, data edges, node movement and deletion | `CREDITS.md` |
-| OpenGenerativeUI | MIT | `src/lib/generative-protocol.ts`, `src/App.tsx` | Adapted the plan → stream → render concept into typed instrument plans and staged slot replacement; implementation is original to this repo | `CREDITS.md` |
-| genui-canvas | MIT | `src/lib/generative-protocol.ts`, `src/App.tsx` | Adapted bidirectional agent/canvas state ideas into typed canvas events and agent readback after human edits | `CREDITS.md` |
-| Zustand | MIT | `src/App.tsx` | Live criteria, budget and focus state shared by generated instruments | `CREDITS.md` |
-| Motion | MIT | `src/App.tsx` | Precise palette/state transitions and layout feedback | `CREDITS.md` |
+| xyflow / React Flow | MIT | `src/canvas/DecisionCanvas.tsx` | Editable generated instruments, ports, data edges, node movement, overview and delete affordances | `CREDITS.md` |
+| OpenGenerativeUI | MIT | `src/protocol/actions.ts`, `src/agent/provider.ts`, `src/agent/PlanApproval.tsx` | Adapted plan → approve → streamed structured actions → validated render; implementation is original to this repo | `CREDITS.md` |
+| genui-canvas | MIT | `src/workspaces/store.ts`, `src/runtime/dispatcher.ts` | Adapted bidirectional agent/canvas state into explicit actor-labelled commands and persistent audit events | `CREDITS.md` |
+| Zustand | MIT | `src/workspaces/store.ts` | Persistent workspace state, undo/redo, snapshots, focus and mobile mode | `CREDITS.md` |
+| Motion | MIT | `src/app/DecisionWorkspace.tsx` | Reduced-motion detection and precise state feedback | `CREDITS.md` |
 
 No OpenGenerativeUI or genui-canvas component source was copied verbatim; their MIT-licensed architecture was studied and reimplemented as a small project-specific protocol.
 
@@ -27,7 +27,7 @@ No OpenGenerativeUI or genui-canvas component source was copied verbatim; their 
 1. **React Flow + typed generative protocol live prototype** — retained. It preserves one spatial editor while making the AI plan and canvas feedback explicit.
 2. **Craft.js API/package comparison** — MIT; `@craftjs/core` is about 483 KB unpacked. Nesting a second drag/drop editor inside React Flow would create conflicting selection and drag semantics.
 3. **Puck API/package comparison** — MIT; current package line is roughly 1.3 MB unpacked. Its page-builder renderer is powerful but too document-oriented for a dependency graph.
-4. **OpenGenerativeUI/genui-canvas source architecture comparison** — both MIT; their streamed UI and bidirectional state patterns were reduced to `createSurfacePlan`, `createCanvasEvent`, and dependency readback rather than importing an application framework.
+4. **OpenGenerativeUI/genui-canvas source architecture comparison** — both MIT; their streamed UI and bidirectional state patterns were reinterpreted as a closed Module SDK, versioned action protocol, approval state, deterministic runtime, and typed human/agent audit events rather than importing an application framework.
 
 ## Investigated but Rejected
 
