@@ -4,6 +4,8 @@ import {
   Boxes,
   CircleStop,
   Download,
+  FileInput,
+  FileOutput,
   Eye,
   History,
   ListTree,
@@ -28,6 +30,7 @@ import { Inspector } from '../provenance/Inspector';
 import { branchWorkspaceUrl, ensureWorkspaceUrl, resolveWorkspaceRoute } from '../routes/workspaceRoute';
 import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/workspace';
 import { copyReadonlyShareUrl, downloadWorkspaceExport } from '../workspaces/export';
+import { downloadInputPack, readInputPack } from '../workspaces/inputPack';
 import { useWorkspaceStore } from '../workspaces/store';
 
 const DEFAULT_REQUEST = 'Compare three hypothetical AI solution vendors using synthetic cost, security, accuracy, and adoption inputs.';
@@ -86,6 +89,7 @@ export function DecisionWorkspace() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const inputPackRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!route.shareToken) ensureWorkspaceUrl(route.workspaceId, route.readonly);
@@ -229,6 +233,38 @@ export function DecisionWorkspace() {
     }
   };
 
+  const importInputPack = async (file: File) => {
+    if (!workspace || workspace.mode === 'readonly') return;
+    try {
+      const pack = await readInputPack(file);
+      const byType = new Map(workspace.modules.map((module) => [module.type, module]));
+      const evidenceModule = byType.get('text-evidence');
+      const sourceModule = byType.get('source-ledger');
+      const vendorModule = byType.get('vendor-matrix');
+      const weightsModule = byType.get('criteria-weights');
+      const costModule = byType.get('cost-model');
+      if (!evidenceModule || !sourceModule || !vendorModule || !weightsModule || !costModule) throw new Error('Assemble the guided graph before importing an input pack.');
+      setInput(evidenceModule.id, { request: pack.request, evidence: pack.evidence.map((item, index) => ({ id: `imported-evidence-${index + 1}`, ...item })) });
+      setInput(sourceModule.id, { sources: pack.sources.map((item, index) => ({ id: `imported-source-${index + 1}`, ...item })) });
+      setInput(vendorModule.id, { vendors: pack.vendors });
+      setInput(weightsModule.id, { weights: pack.weights });
+      setInput(costModule.id, { budgetIndex: pack.budgetIndex });
+      const current = useWorkspaceStore.getState().workspace;
+      if (current) {
+        const next = structuredClone(current);
+        next.request = pack.request;
+        next.name = 'Imported decision workspace';
+        replaceWorkspace(workspaceDocumentSchema.parse(next));
+      }
+      setRequestDraft(pack.request);
+      setStatusMessage('Input pack imported · graph recomputed · previous human decision cleared');
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Input pack import failed');
+    } finally {
+      if (inputPackRef.current) inputPackRef.current.value = '';
+    }
+  };
+
   if (!hydrated || !workspace) {
     return <main className="loading-workspace"><Activity size={18} /><span>RESTORING WORKSPACE</span></main>;
   }
@@ -262,10 +298,12 @@ export function DecisionWorkspace() {
         <div className="query-index">REQUEST<br /><b>{workspace.id}</b></div>
         <textarea aria-label="Decision request" disabled={isReadonly} value={requestDraft} onChange={(event) => setRequestDraft(event.target.value)} />
         <div className="query-actions">
+          {workspace.modules.length ? <><button disabled={isReadonly || isRunning} onClick={() => inputPackRef.current?.click()}><FileInput size={13} /> IMPORT INPUTS</button><button onClick={() => downloadInputPack(workspace)}><FileOutput size={13} /> EXPORT INPUTS</button></> : null}
           {isRunning ? <button className="danger" onClick={cancel}><CircleStop size={13} /> CANCEL</button> : null}
           {!isRunning && workspace.run.status === 'error' && workspace.plan ? <button onClick={() => void assemble(true)}><RotateCw size={13} /> RETRY</button> : null}
           {!isRunning ? <button disabled={isReadonly} onClick={() => void createPlan()}><Play size={13} fill="currentColor" /> PLAN REQUEST</button> : null}
         </div>
+        <input ref={inputPackRef} hidden type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importInputPack(file); }} />
       </section>
 
       <section className="workspace-frame">
@@ -291,6 +329,18 @@ export function DecisionWorkspace() {
           <div><History size={11} /><span>snapshots</span><b>{workspace.snapshots.length}</b></div>
           <div><Share2 size={11} /><span>mode</span><b>{workspace.mode}</b></div>
         </div>
+        {workspace.modules.length ? (() => {
+          const evidenceInput = workspace.modules.find((module) => module.type === 'text-evidence')?.input.evidence;
+          const sourceInput = workspace.modules.find((module) => module.type === 'source-ledger')?.input.sources;
+          const vendorInput = workspace.modules.find((module) => module.type === 'vendor-matrix')?.input.vendors;
+          const evidenceCount = Array.isArray(evidenceInput) ? evidenceInput.length : 0;
+          const sourceRows = Array.isArray(sourceInput) ? sourceInput.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
+          const vendorRows = Array.isArray(vendorInput) ? vendorInput.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
+          const syntheticSources = sourceRows.filter((item) => String(item.locator ?? '').startsWith('synthetic://')).length;
+          const referenceVendors = vendorRows.filter((item) => /^Vendor [A-Z]$/.test(String(item.name ?? ''))).length;
+          const userReady = syntheticSources === 0 && referenceVendors === 0 && evidenceCount > 0;
+          return <div className={`input-readiness ${userReady ? 'ready' : 'reference'}`}><span>INPUT READINESS</span><strong>{userReady ? 'USER INPUTS' : 'REFERENCE DATA REMAINS'}</strong><p>{evidenceCount} evidence · {sourceRows.length} sources · {vendorRows.length} options</p><small>{userReady ? 'No built-in synthetic locator or reference vendor name detected.' : `${syntheticSources} synthetic source locator${syntheticSources === 1 ? '' : 's'} · ${referenceVendors} reference vendor name${referenceVendors === 1 ? '' : 's'}`}</small></div>;
+        })() : null}
         <div className="agent-readback"><Network size={11} /><span>{statusMessage}</span></div>
         <div className="log-lines">{latestLog.length ? latestLog.map((event, index) => <p key={event.id}><span>{String(index + 1).padStart(2, '0')}</span><b>{event.actor}</b>{event.kind} / {event.detail}</p>) : <p><span>00</span>awaiting plan</p>}</div>
         <div className="share-export"><button onClick={() => void share()}><Share2 size={12} /> READ-ONLY SHARE</button><button onClick={() => downloadWorkspaceExport(workspace)}><Download size={12} /> EXPORT JSON</button>{shareState ? <p>{shareState}</p> : null}</div>

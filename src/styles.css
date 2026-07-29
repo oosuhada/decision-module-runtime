@@ -269,6 +269,12 @@ button:disabled { opacity: .42; cursor: not-allowed !important; }
 
 .mobile-workspace { display: none; }
 .surface-footer { grid-column: 2 / -1; grid-row: 4; border-top: 1px solid var(--line); background: #e7e9eb; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font: 7px var(--mono); color: #757a80; z-index: 40; }
+.input-readiness { margin: 8px; padding: 10px; border: 1px solid #c3c7cb; background: #eef0f2; display: grid; gap: 4px; }
+.input-readiness > span { font: 7px var(--mono); color: #777e84; }
+.input-readiness > strong { font: 9px var(--mono); color: #9a5d2d; }
+.input-readiness.ready > strong { color: #28734f; }
+.input-readiness p { margin: 0; font: 9px var(--mono); color: #3f464d; }
+.input-readiness small { font: 7px/1.4 var(--mono); color: #777e84; }
 
 .loading-workspace, .fatal-boundary { width: 100vw; height: 100dvh; display: grid; place-items: center; align-content: center; gap: 10px; background: #f4f5f6; }
 .loading-workspace span, .fatal-boundary > span { font: 9px var(--mono); color: #71777d; }

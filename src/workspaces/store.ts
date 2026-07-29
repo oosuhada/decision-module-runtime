@@ -207,6 +207,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       next.modules = markDependentsStale(next.modules, next.edges, id);
       const computed = recomputeGraph(next.modules, next.edges, [id]);
       next.modules = computed.modules;
+      const recommendation = next.modules.find((candidate) => candidate.type === 'recommendation-logic')?.output.recommendation;
+      const counter = next.modules.find((candidate) => candidate.type === 'counter-case')?.output;
+      next.decision.recommendation = typeof recommendation === 'string' ? recommendation : null;
+      next.decision.counterCase = typeof counter?.counterCase === 'string' ? counter.counterCase : null;
+      next.decision.uncertainty = typeof counter?.uncertainty === 'string' ? counter.uncertainty : null;
+      if (next.decision.humanChoice) {
+        next.decision.humanChoice = null;
+        next.decision.rationale = null;
+        next.decision.decidedAt = null;
+      }
       withHumanAudit(next, 'input-changed', `${id} recomputed ${computed.computed.join(' → ')}`, id);
       commit(next, true);
     },

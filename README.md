@@ -37,6 +37,8 @@ Write a decision request
 - Undo/redo, named snapshots, restore, compare, and branch workflows.
 - Module-level provenance and workspace audit history.
 - Human decision gate separate from system recommendation.
+- Reusable decision input packs for importing/exporting evidence, source locators, options, weights, and budget without replacing runtime structure.
+- Recorded human decisions are invalidated when upstream inputs change so stale commitments cannot silently survive recomputation.
 - IndexedDB persistence with FastAPI synchronization.
 - Frozen read-only share snapshots and JSON export.
 - Accessible list/tree representation alongside the spatial canvas.
