@@ -1,5 +1,7 @@
 # Decision Module Runtime
 
+The runtime is now request-template driven rather than vendor-graph driven. The deterministic planner selects distinct registered-module DAGs for **vendor selection, build vs buy, product launch, rollout strategy, and architecture choice**, with dedicated closed-registry scoring modules for each domain. A new Module Catalog lets users add/remove registered modules, connect or disconnect dependencies, reject cycles, and deterministically recompute the edited graph without executing generated code.
+
 Decision Module Runtime is a full-stack workbench for assembling an auditable decision graph from validated modules, deterministic calculations, provenance, and an explicit human decision gate.
 
 The project began as an interaction experiment called **Generative Decision Surface**. The current implementation treats generated planning as an adapter around a closed runtime rather than allowing an AI model to create arbitrary trusted UI or calculation logic.

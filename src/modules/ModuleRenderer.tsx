@@ -138,6 +138,39 @@ function VendorMatrix({ module, readonly, onInput }: RendererProps) {
   );
 }
 
+function StructuredScorecard({ module, readonly, onInput }: RendererProps) {
+  const inputOptions = records(module.input.options);
+  const ranking = records(module.output.ranking);
+  const fields = inputOptions.length
+    ? Object.keys(inputOptions[0]).filter((field) => field !== 'name')
+    : [];
+  const fieldLabel = (field: string) => field.replace(/([A-Z])/g, ' $1').replace(/^./, (value) => value.toUpperCase());
+  const updateOption = (index: number, field: string, value: string) => {
+    const next = inputOptions.map((option) => ({ ...option }));
+    if (!next[index]) return;
+    next[index][field] = field === 'name' ? value : Math.max(0, Math.min(100, Number(value) || 0));
+    onInput({ options: next });
+  };
+  const addOption = () => onInput({ options: [...inputOptions, { name: `Option ${inputOptions.length + 1}`, ...Object.fromEntries(fields.map((field) => [field, 50])) }] });
+  const removeOption = (index: number) => onInput({ options: inputOptions.filter((_, optionIndex) => optionIndex !== index) });
+
+  return <div className="structured-scorecard nodrag nowheel">
+    <div className="scorecard-inputs">
+      <div className="scorecard-row scorecard-head"><span>option</span>{fields.map((field) => <span key={field}>{fieldLabel(field)}</span>)}{!readonly ? <span /> : null}</div>
+      {inputOptions.map((option, index) => <div className="scorecard-row" key={`${String(option.name)}-${index}`}>
+        <input aria-label={`Option ${index + 1} name`} disabled={readonly} value={String(option.name ?? '')} onChange={(event) => updateOption(index, 'name', event.target.value)} />
+        {fields.map((field) => <input key={field} aria-label={`${String(option.name)} ${fieldLabel(field)}`} disabled={readonly} type="number" min="0" max="100" value={Number(option[field] ?? 0)} onChange={(event) => updateOption(index, field, event.target.value)} />)}
+        {!readonly ? <button type="button" onClick={() => removeOption(index)} aria-label={`Remove ${String(option.name)}`}><Trash2 size={10} /></button> : null}
+      </div>)}
+      {!readonly ? <button className="add-reference-row" type="button" onClick={addOption}><Plus size={11} /> ADD OPTION</button> : null}
+    </div>
+    <div className="scorecard-ranking">
+      <span>DETERMINISTIC RANKING</span>
+      {ranking.map((option, index) => <div key={`${String(option.name)}-rank`} className={index === 0 ? 'best' : ''}><b>{String(index + 1).padStart(2, '0')}</b><strong>{String(option.name)}</strong><span>{String(option.score)}</span></div>)}
+    </div>
+  </div>;
+}
+
 export function ModuleRenderer(props: RendererProps) {
   const { module, readonly, onInput } = props;
 
@@ -148,6 +181,11 @@ export function ModuleRenderer(props: RendererProps) {
       return <CriteriaWeights {...props} />;
     case 'vendor-matrix':
       return <VendorMatrix {...props} />;
+    case 'build-buy-economics':
+    case 'launch-readiness':
+    case 'rollout-sequencer':
+    case 'architecture-fit':
+      return <StructuredScorecard {...props} />;
     case 'cost-model': {
       const budgetIndex = Number(module.input.budgetIndex ?? 72);
       return <div className="cost-control nodrag nowheel"><div><CircleDollarSign size={17} /><span>MAX INTEGRATION INDEX</span><strong>{budgetIndex}</strong></div><input aria-label="Budget index" disabled={readonly} type="range" min="45" max="95" value={budgetIndex} onChange={(event) => onInput({ budgetIndex: Number(event.target.value) })} /><small>{String(module.output.constraint ?? 'Changing this value recomputes downstream modules.')}</small></div>;
@@ -155,7 +193,7 @@ export function ModuleRenderer(props: RendererProps) {
     case 'risk-matrix':
       return <div className="risk-bars">{records(module.output.risks).map((risk) => <div key={String(risk.name)}><span>{String(risk.name)}</span><i><b style={{ width: `${Math.max(0, Math.min(100, Number(risk.risk ?? 0)))}%` }} /></i><strong>{String(risk.risk)}</strong></div>)}</div>;
     case 'scenario-comparison':
-      return <div className="scenario-list">{records(module.output.scenarios).map((scenario) => <div key={String(scenario.label)}><span>{String(scenario.label)}</span><strong>{String(scenario.vendor)}</strong><b>{String(scenario.score)}</b></div>)}</div>;
+      return <div className="scenario-list">{records(module.output.scenarios).map((scenario) => <div key={String(scenario.label)}><span>{String(scenario.label)}</span><strong>{String(scenario.option ?? scenario.vendor ?? '')}</strong><b>{String(scenario.score)}</b></div>)}</div>;
     case 'chart':
       return <div className="score-chart" role="img" aria-label={module.accessibilitySummary}>{records(module.output.series).map((bar) => <div key={String(bar.label)}><span>{String(bar.label)}</span><i><b style={{ width: `${Math.max(0, Math.min(100, Number(bar.value ?? 0)))}%` }} /></i><strong>{String(bar.value)}</strong></div>)}</div>;
     case 'recommendation-logic':

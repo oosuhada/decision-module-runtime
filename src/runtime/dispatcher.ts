@@ -50,17 +50,25 @@ export function dispatchProtocolAction(workspace: WorkspaceDocument, raw: unknow
         if (next.edges.some((edge) => edge.id === action.payload.id)) throw new Error(`Edge already exists: ${action.payload.id}`);
         next.edges.push(action.payload);
         assertAcyclic(next.modules, next.edges);
+        const target = next.modules.find((module) => module.id === action.payload.target);
+        if (target && !target.dependencies.includes(action.payload.source)) target.dependencies.push(action.payload.source);
         next.audit.push(auditFor(next, action, `Connected ${action.payload.source} → ${action.payload.target}`));
         break;
       }
       case 'disconnect': {
+        const removed = next.edges.find((edge) => edge.id === action.payload.id);
         next.edges = next.edges.filter((edge) => edge.id !== action.payload.id);
+        if (removed) {
+          const target = next.modules.find((module) => module.id === removed.target);
+          if (target) target.dependencies = target.dependencies.filter((dependency) => dependency !== removed.source);
+        }
         next.audit.push(auditFor(next, action, `Disconnected ${action.payload.id}`));
         break;
       }
       case 'remove_module': {
         next.modules = next.modules.filter((module) => module.id !== action.payload.id);
         next.edges = next.edges.filter((edge) => edge.source !== action.payload.id && edge.target !== action.payload.id);
+        next.modules.forEach((module) => { module.dependencies = module.dependencies.filter((dependency) => dependency !== action.payload.id); });
         next.audit.push(auditFor(next, action, `Removed ${action.payload.id}`));
         break;
       }

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { fetchRemoteShare, fetchRemoteWorkspace, saveRemoteWorkspace, type ApiStatus } from '../api/client';
 import { saveWorkspaceLocal, loadWorkspaceLocal } from '../persistence/indexedDb';
-import { agentPlanSchema, auditEventSchema, createEmptyWorkspace, snapshotSchema, workspaceDocumentSchema, type AgentPlan, type HumanDecision, type ModulePosition, type WorkspaceDocument, type WorkspaceSnapshot } from '../schemas/workspace';
+import { agentPlanSchema, auditEventSchema, createEmptyWorkspace, snapshotSchema, workspaceDocumentSchema, type AgentPlan, type HumanDecision, type ModuleInstance, type ModulePosition, type ModuleType, type WorkspaceDocument, type WorkspaceSnapshot } from '../schemas/workspace';
 import { dispatchProtocolAction } from '../runtime/dispatcher';
-import { markDependentsStale, recomputeGraph } from '../runtime/graph';
+import { assertAcyclic, markDependentsStale, recomputeGraph } from '../runtime/graph';
+import { getModuleContract, moduleCatalog, validateModuleInput } from '../modules/registry';
 
 type HistoryFrame = Pick<WorkspaceDocument, 'modules' | 'edges' | 'decision'>;
 type MobileMode = 'stack' | 'focused' | 'dependencies' | 'summary';
@@ -31,6 +32,9 @@ type WorkspaceState = {
   setInput: (id: string, input: Record<string, unknown>) => void;
   moveModule: (id: string, position: ModulePosition) => void;
   removeModule: (id: string) => void;
+  addRegisteredModule: (type: ModuleType) => void;
+  connectModules: (source: string, target: string) => { ok: boolean; reason?: string };
+  disconnectEdge: (id: string) => void;
   undo: () => void;
   redo: () => void;
   createSnapshot: (name: string) => WorkspaceSnapshot | null;
@@ -44,6 +48,19 @@ type WorkspaceState = {
 };
 
 const defaultRequest = 'Compare three AI solution vendors by cost, security, accuracy, and field adoption difficulty.';
+
+function syncComputedDecision(workspace: WorkspaceDocument) {
+  const recommendation = workspace.modules.find((candidate) => candidate.type === 'recommendation-logic')?.output.recommendation;
+  const counter = workspace.modules.find((candidate) => candidate.type === 'counter-case')?.output;
+  workspace.decision.recommendation = typeof recommendation === 'string' ? recommendation : null;
+  workspace.decision.counterCase = typeof counter?.counterCase === 'string' ? counter.counterCase : null;
+  workspace.decision.uncertainty = typeof counter?.uncertainty === 'string' ? counter.uncertainty : null;
+  if (workspace.decision.humanChoice) {
+    workspace.decision.humanChoice = null;
+    workspace.decision.rationale = null;
+    workspace.decision.decidedAt = null;
+  }
+}
 
 function frame(workspace: WorkspaceDocument): HistoryFrame {
   return structuredClone({ modules: workspace.modules, edges: workspace.edges, decision: workspace.decision });
@@ -207,16 +224,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       next.modules = markDependentsStale(next.modules, next.edges, id);
       const computed = recomputeGraph(next.modules, next.edges, [id]);
       next.modules = computed.modules;
-      const recommendation = next.modules.find((candidate) => candidate.type === 'recommendation-logic')?.output.recommendation;
-      const counter = next.modules.find((candidate) => candidate.type === 'counter-case')?.output;
-      next.decision.recommendation = typeof recommendation === 'string' ? recommendation : null;
-      next.decision.counterCase = typeof counter?.counterCase === 'string' ? counter.counterCase : null;
-      next.decision.uncertainty = typeof counter?.uncertainty === 'string' ? counter.uncertainty : null;
-      if (next.decision.humanChoice) {
-        next.decision.humanChoice = null;
-        next.decision.rationale = null;
-        next.decision.decidedAt = null;
-      }
+      syncComputedDecision(next);
       withHumanAudit(next, 'input-changed', `${id} recomputed ${computed.computed.join(' → ')}`, id);
       commit(next, true);
     },
@@ -236,7 +244,81 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const next = structuredClone(current);
       next.modules = next.modules.filter((module) => module.id !== id);
       next.edges = next.edges.filter((edge) => edge.source !== id && edge.target !== id);
+      next.modules.forEach((module) => { module.dependencies = module.dependencies.filter((dependency) => dependency !== id); });
+      const computed = recomputeGraph(next.modules, next.edges);
+      next.modules = computed.modules;
+      syncComputedDecision(next);
       withHumanAudit(next, 'module-removed', `Removed ${id}; undo available`, id);
+      commit(next, true);
+    },
+    addRegisteredModule(type) {
+      const current = get().workspace;
+      if (!current || current.mode === 'readonly') return;
+      const catalog = moduleCatalog.find((entry) => entry.type === type);
+      if (!catalog) return;
+      const contract = getModuleContract(type);
+      const input = structuredClone(catalog.defaultInput);
+      const validation = validateModuleInput(type, input);
+      if (!validation.success) return;
+      const next = structuredClone(current);
+      const suffix = Math.random().toString(36).slice(2, 7);
+      const id = `${type}-${suffix}`;
+      const now = new Date().toISOString();
+      const index = next.modules.length;
+      const module: ModuleInstance = {
+        id,
+        type,
+        version: contract.version,
+        title: catalog.title,
+        position: { x: 80 + (index % 4) * 350, y: 90 + Math.floor(index / 4) * 300 },
+        input: validation.data,
+        output: {},
+        dependencies: [],
+        status: 'loading',
+        error: null,
+        provenance: { createdBy: 'human', createdAt: now, updatedAt: now, sources: [], formula: contract.formula, lastRecomputeAt: null, previousVersion: null, runId: null },
+        accessibilitySummary: `Human-added registered ${catalog.title} module.`,
+      };
+      next.modules.push(module);
+      const computed = recomputeGraph(next.modules, next.edges, [id]);
+      next.modules = computed.modules;
+      syncComputedDecision(next);
+      withHumanAudit(next, 'module-added', `Added registered ${type}`, id);
+      commit(next, true);
+      set({ focusedModuleId: id });
+    },
+    connectModules(source, target) {
+      const current = get().workspace;
+      if (!current || current.mode === 'readonly') return { ok: false, reason: 'Workspace is read-only.' };
+      if (source === target) return { ok: false, reason: 'A module cannot depend on itself.' };
+      if (!current.modules.some((module) => module.id === source) || !current.modules.some((module) => module.id === target)) return { ok: false, reason: 'Select two existing modules.' };
+      if (current.edges.some((edge) => edge.source === source && edge.target === target)) return { ok: false, reason: 'That dependency already exists.' };
+      const next = structuredClone(current);
+      next.edges.push({ id: `${source}->${target}-${Math.random().toString(36).slice(2, 6)}`, source, target });
+      try { assertAcyclic(next.modules, next.edges); }
+      catch (error) { return { ok: false, reason: error instanceof Error ? error.message : 'Dependency would create a cycle.' }; }
+      const targetModule = next.modules.find((module) => module.id === target);
+      if (targetModule && !targetModule.dependencies.includes(source)) targetModule.dependencies.push(source);
+      const computed = recomputeGraph(next.modules, next.edges, [source]);
+      next.modules = computed.modules;
+      syncComputedDecision(next);
+      withHumanAudit(next, 'dependency-connected', `${source} → ${target}`, target);
+      commit(next, true);
+      return { ok: true };
+    },
+    disconnectEdge(id) {
+      const current = get().workspace;
+      if (!current || current.mode === 'readonly') return;
+      const removed = current.edges.find((edge) => edge.id === id);
+      if (!removed) return;
+      const next = structuredClone(current);
+      next.edges = next.edges.filter((edge) => edge.id !== id);
+      const targetModule = next.modules.find((module) => module.id === removed.target);
+      if (targetModule) targetModule.dependencies = targetModule.dependencies.filter((dependency) => dependency !== removed.source);
+      const computed = recomputeGraph(next.modules, next.edges);
+      next.modules = computed.modules;
+      syncComputedDecision(next);
+      withHumanAudit(next, 'dependency-disconnected', `${removed.source} → ${removed.target}`, removed.target);
       commit(next, true);
     },
     undo() {

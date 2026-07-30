@@ -11,6 +11,7 @@ import {
   ListTree,
   Network,
   PanelRightOpen,
+  PackagePlus,
   Play,
   Redo2,
   RotateCw,
@@ -26,6 +27,7 @@ import { AccessibleDecisionTree } from '../canvas/AccessibleDecisionTree';
 import { DecisionCanvas } from '../canvas/DecisionCanvas';
 import { MobileWorkspace } from '../canvas/MobileWorkspace';
 import { RuntimeGuide } from '../components/RuntimeGuide';
+import { ModuleCatalog } from '../components/ModuleCatalog';
 import { Inspector } from '../provenance/Inspector';
 import { branchWorkspaceUrl, ensureWorkspaceUrl, resolveWorkspaceRoute } from '../routes/workspaceRoute';
 import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/workspace';
@@ -33,7 +35,15 @@ import { copyReadonlyShareUrl, downloadWorkspaceExport } from '../workspaces/exp
 import { downloadInputPack, readInputPack } from '../workspaces/inputPack';
 import { useWorkspaceStore } from '../workspaces/store';
 
-const DEFAULT_REQUEST = 'Compare three hypothetical AI solution vendors using synthetic cost, security, accuracy, and adoption inputs.';
+const DEFAULT_REQUEST = 'Should we build this capability in-house, buy a platform, or use a hybrid approach?';
+
+const REQUEST_TEMPLATES = [
+  ['BUILD VS BUY', 'Should we build this capability in-house, buy a platform, or use a hybrid approach?'],
+  ['VENDOR', 'Which vendor should we select based on cost, security, accuracy, and adoption?'],
+  ['PRODUCT LAUNCH', 'Should we use a controlled beta, phased launch, or broad product launch?'],
+  ['ROLLOUT', 'Should we pilot first, use a staged rollout, or deploy in one big-bang rollout?'],
+  ['ARCHITECTURE', 'Which architecture should we choose for the next version of this system?'],
+] as const;
 
 function useLowPower() {
   return useMemo(() => {
@@ -80,6 +90,9 @@ export function DecisionWorkspace() {
   const setMobileMode = useWorkspaceStore((state) => state.setMobileMode);
   const setInspectorOpen = useWorkspaceStore((state) => state.setInspectorOpen);
   const replaceWorkspace = useWorkspaceStore((state) => state.replaceWorkspace);
+  const addRegisteredModule = useWorkspaceStore((state) => state.addRegisteredModule);
+  const connectModules = useWorkspaceStore((state) => state.connectModules);
+  const disconnectEdge = useWorkspaceStore((state) => state.disconnectEdge);
 
   const [requestDraft, setRequestDraft] = useState(DEFAULT_REQUEST);
   const [planning, setPlanning] = useState(false);
@@ -88,6 +101,7 @@ export function DecisionWorkspace() {
   const [shareState, setShareState] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputPackRef = useRef<HTMLInputElement | null>(null);
 
@@ -289,6 +303,7 @@ export function DecisionWorkspace() {
         <button disabled={isReadonly || !past.length} onClick={undo} title="Undo"><Undo2 size={17} /></button>
         <button disabled={isReadonly || !future.length} onClick={redo} title="Redo"><Redo2 size={17} /></button>
         <button onClick={() => setInspectorOpen(true)} title="Inspector"><PanelRightOpen size={17} /></button>
+        <button onClick={() => setCatalogOpen(true)} title="Module catalog"><PackagePlus size={17} /></button>
         <span />
         <button onClick={() => createSnapshot('Manual checkpoint')} disabled={isReadonly || !workspace.modules.length} title="Snapshot"><Save size={17} /></button>
         <button onClick={() => downloadWorkspaceExport(workspace)} title="Export"><Download size={17} /></button>
@@ -297,8 +312,9 @@ export function DecisionWorkspace() {
       <section className="query-strip">
         <div className="query-index">REQUEST<br /><b>{workspace.id}</b></div>
         <textarea aria-label="Decision request" disabled={isReadonly} value={requestDraft} onChange={(event) => setRequestDraft(event.target.value)} />
+        <div className="request-template-picker" aria-label="Decision request templates">{REQUEST_TEMPLATES.map(([label, request]) => <button key={label} type="button" disabled={isReadonly || isRunning} onClick={() => setRequestDraft(request)}>{label}</button>)}</div>
         <div className="query-actions">
-          {workspace.modules.length ? <><button disabled={isReadonly || isRunning} onClick={() => inputPackRef.current?.click()}><FileInput size={13} /> IMPORT INPUTS</button><button onClick={() => downloadInputPack(workspace)}><FileOutput size={13} /> EXPORT INPUTS</button></> : null}
+          {workspace.modules.some((module) => module.type === 'vendor-matrix') ? <><button disabled={isReadonly || isRunning} onClick={() => inputPackRef.current?.click()}><FileInput size={13} /> IMPORT VENDOR PACK</button><button onClick={() => downloadInputPack(workspace)}><FileOutput size={13} /> EXPORT VENDOR PACK</button></> : null}
           {isRunning ? <button className="danger" onClick={cancel}><CircleStop size={13} /> CANCEL</button> : null}
           {!isRunning && workspace.run.status === 'error' && workspace.plan ? <button onClick={() => void assemble(true)}><RotateCw size={13} /> RETRY</button> : null}
           {!isRunning ? <button disabled={isReadonly} onClick={() => void createPlan()}><Play size={13} fill="currentColor" /> PLAN REQUEST</button> : null}
@@ -311,7 +327,7 @@ export function DecisionWorkspace() {
         {!workspace.modules.length && !workspace.plan ? (
           <div className="blank-workspace">
             <div className="origin-cross"><i /><i /><span>0,0</span></div>
-            <div className="blank-message"><Network size={25} /><span>QUICK START / NO EXECUTABLE GRAPH</span><h1>Build your own graph, or load a working one first.</h1><p>The local reference planner is deterministic. Only registered modules can enter the application; inputs and outputs are validated, computation stays deterministic, and every human edit remains undoable and saved.</p><div className="blank-actions"><button className="primary" disabled={isReadonly || isRunning} onClick={() => void loadGuidedDemo()}><Play size={13} fill="currentColor" /> LOAD GUIDED DEMO</button><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN CURRENT REQUEST</button></div><small>The guided demo uses synthetic vendors and evidence, then shows exactly where to replace them with your own inputs.</small></div>
+            <div className="blank-message"><Network size={25} /><span>QUICK START / NO EXECUTABLE GRAPH</span><h1>Choose a decision type, then inspect the graph it actually needs.</h1><p>The local planner selects a different closed-registry composition for vendor selection, build vs buy, product launch, rollout strategy, and architecture choice. You can then add, remove, or reconnect registered modules without executing generated code.</p><div className="blank-actions"><button className="primary" disabled={isReadonly || isRunning} onClick={() => void loadGuidedDemo()}><Play size={13} fill="currentColor" /> LOAD BUILD / BUY DEMO</button><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN CURRENT REQUEST</button><button disabled={isReadonly} onClick={() => setCatalogOpen(true)}><PackagePlus size={13} /> OPEN MODULE CATALOG</button></div><small>Every graph edit is schema validated, cycle checked, deterministically recomputed, auditable, and undoable.</small></div>
           </div>
         ) : null}
         {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}
@@ -332,14 +348,15 @@ export function DecisionWorkspace() {
         {workspace.modules.length ? (() => {
           const evidenceInput = workspace.modules.find((module) => module.type === 'text-evidence')?.input.evidence;
           const sourceInput = workspace.modules.find((module) => module.type === 'source-ledger')?.input.sources;
-          const vendorInput = workspace.modules.find((module) => module.type === 'vendor-matrix')?.input.vendors;
+          const scoringModule = workspace.modules.find((module) => ['vendor-matrix', 'build-buy-economics', 'launch-readiness', 'rollout-sequencer', 'architecture-fit'].includes(module.type));
+          const optionInput = scoringModule?.type === 'vendor-matrix' ? scoringModule.input.vendors : scoringModule?.input.options;
           const evidenceCount = Array.isArray(evidenceInput) ? evidenceInput.length : 0;
           const sourceRows = Array.isArray(sourceInput) ? sourceInput.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
-          const vendorRows = Array.isArray(vendorInput) ? vendorInput.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
+          const optionRows = Array.isArray(optionInput) ? optionInput.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object') : [];
           const syntheticSources = sourceRows.filter((item) => String(item.locator ?? '').startsWith('synthetic://')).length;
-          const referenceVendors = vendorRows.filter((item) => /^Vendor [A-Z]$/.test(String(item.name ?? ''))).length;
-          const userReady = syntheticSources === 0 && referenceVendors === 0 && evidenceCount > 0;
-          return <div className={`input-readiness ${userReady ? 'ready' : 'reference'}`}><span>INPUT READINESS</span><strong>{userReady ? 'USER INPUTS' : 'REFERENCE DATA REMAINS'}</strong><p>{evidenceCount} evidence · {sourceRows.length} sources · {vendorRows.length} options</p><small>{userReady ? 'No built-in synthetic locator or reference vendor name detected.' : `${syntheticSources} synthetic source locator${syntheticSources === 1 ? '' : 's'} · ${referenceVendors} reference vendor name${referenceVendors === 1 ? '' : 's'}`}</small></div>;
+          const referenceOptions = optionRows.filter((item) => /^(Vendor [A-Z]|Build in-house|Buy platform|Hybrid|Controlled beta|Phased launch|Broad launch|Pilot first|Staged rollout|Big bang|Modular monolith|Service architecture|Managed platform)$/.test(String(item.name ?? ''))).length;
+          const userReady = syntheticSources === 0 && referenceOptions === 0 && evidenceCount > 0;
+          return <div className={`input-readiness ${userReady ? 'ready' : 'reference'}`}><span>INPUT READINESS / {scoringModule?.type ?? 'NO SCORER'}</span><strong>{userReady ? 'USER INPUTS' : 'REFERENCE DATA REMAINS'}</strong><p>{evidenceCount} evidence · {sourceRows.length} sources · {optionRows.length} options</p><small>{userReady ? 'No built-in synthetic locator or reference option name detected.' : `${syntheticSources} synthetic source locator${syntheticSources === 1 ? '' : 's'} · ${referenceOptions} reference option name${referenceOptions === 1 ? '' : 's'}`}</small></div>;
         })() : null}
         <div className="agent-readback"><Network size={11} /><span>{statusMessage}</span></div>
         <div className="log-lines">{latestLog.length ? latestLog.map((event, index) => <p key={event.id}><span>{String(index + 1).padStart(2, '0')}</span><b>{event.actor}</b>{event.kind} / {event.detail}</p>) : <p><span>00</span>awaiting plan</p>}</div>
@@ -357,6 +374,8 @@ export function DecisionWorkspace() {
         compareSnapshotId={compareSnapshotId}
         onBranch={branchFromSnapshot}
       />
+
+      <ModuleCatalog workspace={workspace} open={catalogOpen} onClose={() => setCatalogOpen(false)} onAdd={addRegisteredModule} onConnect={connectModules} onDisconnect={disconnectEdge} />
 
       {guideOpen && workspace.modules.length ? <RuntimeGuide step={guideStep} onStep={setGuideStep} onClose={() => setGuideOpen(false)} onFocus={(moduleId) => { focusModule(moduleId); setInspectorOpen(true); }} /> : null}
 
