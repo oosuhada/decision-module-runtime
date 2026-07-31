@@ -251,18 +251,27 @@ export function DecisionWorkspace() {
     if (!workspace || workspace.mode === 'readonly') return;
     try {
       const pack = await readInputPack(file);
-      const byType = new Map(workspace.modules.map((module) => [module.type, module]));
-      const evidenceModule = byType.get('text-evidence');
-      const sourceModule = byType.get('source-ledger');
-      const vendorModule = byType.get('vendor-matrix');
-      const weightsModule = byType.get('criteria-weights');
-      const costModule = byType.get('cost-model');
-      if (!evidenceModule || !sourceModule || !vendorModule || !weightsModule || !costModule) throw new Error('Assemble the guided graph before importing an input pack.');
-      setInput(evidenceModule.id, { request: pack.request, evidence: pack.evidence.map((item, index) => ({ id: `imported-evidence-${index + 1}`, ...item })) });
-      setInput(sourceModule.id, { sources: pack.sources.map((item, index) => ({ id: `imported-source-${index + 1}`, ...item })) });
-      setInput(vendorModule.id, { vendors: pack.vendors });
-      setInput(weightsModule.id, { weights: pack.weights });
-      setInput(costModule.id, { budgetIndex: pack.budgetIndex });
+      if (pack.format === 'decision-input-pack/2.0') {
+        for (const incoming of pack.modules) {
+          const exact = workspace.modules.find((module) => module.id === incoming.id && module.type === incoming.type);
+          const sameType = workspace.modules.find((module) => module.type === incoming.type);
+          const target = exact ?? sameType;
+          if (target) setInput(target.id, incoming.input);
+        }
+      } else {
+        const byType = new Map(workspace.modules.map((module) => [module.type, module]));
+        const evidenceModule = byType.get('text-evidence');
+        const sourceModule = byType.get('source-ledger');
+        const vendorModule = byType.get('vendor-matrix');
+        const weightsModule = byType.get('criteria-weights');
+        const costModule = byType.get('cost-model');
+        if (!evidenceModule || !sourceModule || !vendorModule || !weightsModule || !costModule) throw new Error('This legacy vendor input pack requires a vendor-selection graph.');
+        setInput(evidenceModule.id, { request: pack.request, evidence: pack.evidence.map((item, index) => ({ id: `imported-evidence-${index + 1}`, ...item })) });
+        setInput(sourceModule.id, { sources: pack.sources.map((item, index) => ({ id: `imported-source-${index + 1}`, ...item })) });
+        setInput(vendorModule.id, { vendors: pack.vendors });
+        setInput(weightsModule.id, { weights: pack.weights });
+        setInput(costModule.id, { budgetIndex: pack.budgetIndex });
+      }
       const current = useWorkspaceStore.getState().workspace;
       if (current) {
         const next = structuredClone(current);
@@ -271,7 +280,7 @@ export function DecisionWorkspace() {
         replaceWorkspace(workspaceDocumentSchema.parse(next));
       }
       setRequestDraft(pack.request);
-      setStatusMessage('Input pack imported · graph recomputed · previous human decision cleared');
+      setStatusMessage('Input pack imported · matching registered modules recomputed · previous human decision cleared');
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Input pack import failed');
     } finally {
@@ -314,7 +323,7 @@ export function DecisionWorkspace() {
         <textarea aria-label="Decision request" disabled={isReadonly} value={requestDraft} onChange={(event) => setRequestDraft(event.target.value)} />
         <div className="request-template-picker" aria-label="Decision request templates">{REQUEST_TEMPLATES.map(([label, request]) => <button key={label} type="button" disabled={isReadonly || isRunning} onClick={() => setRequestDraft(request)}>{label}</button>)}</div>
         <div className="query-actions">
-          {workspace.modules.some((module) => module.type === 'vendor-matrix') ? <><button disabled={isReadonly || isRunning} onClick={() => inputPackRef.current?.click()}><FileInput size={13} /> IMPORT VENDOR PACK</button><button onClick={() => downloadInputPack(workspace)}><FileOutput size={13} /> EXPORT VENDOR PACK</button></> : null}
+          {workspace.modules.length ? <><button disabled={isReadonly || isRunning} onClick={() => inputPackRef.current?.click()}><FileInput size={13} /> IMPORT INPUTS</button><button onClick={() => downloadInputPack(workspace)}><FileOutput size={13} /> EXPORT INPUTS</button></> : null}
           {isRunning ? <button className="danger" onClick={cancel}><CircleStop size={13} /> CANCEL</button> : null}
           {!isRunning && workspace.run.status === 'error' && workspace.plan ? <button onClick={() => void assemble(true)}><RotateCw size={13} /> RETRY</button> : null}
           {!isRunning ? <button disabled={isReadonly} onClick={() => void createPlan()}><Play size={13} fill="currentColor" /> PLAN REQUEST</button> : null}
@@ -377,7 +386,7 @@ export function DecisionWorkspace() {
 
       <ModuleCatalog workspace={workspace} open={catalogOpen} onClose={() => setCatalogOpen(false)} onAdd={addRegisteredModule} onConnect={connectModules} onDisconnect={disconnectEdge} />
 
-      {guideOpen && workspace.modules.length ? <RuntimeGuide step={guideStep} onStep={setGuideStep} onClose={() => setGuideOpen(false)} onFocus={(moduleId) => { focusModule(moduleId); setInspectorOpen(true); }} /> : null}
+      {guideOpen && workspace.modules.length ? <RuntimeGuide workspace={workspace} step={guideStep} onStep={setGuideStep} onClose={() => setGuideOpen(false)} onFocus={(moduleId) => { focusModule(moduleId); setInspectorOpen(true); }} /> : null}
 
       <footer className="surface-footer"><span>SCHEMA-VALIDATED MODULES · DETERMINISTIC COMPUTE · HUMAN DECISION</span><span>{isReadonly ? 'READ-ONLY SHARE' : `UNDO ${past.length} · REDO ${future.length}`} · {quietMotion ? 'QUIET MOTION' : 'FULL MOTION'}</span></footer>
     </main>
