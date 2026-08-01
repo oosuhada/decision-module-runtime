@@ -4,6 +4,17 @@ The runtime is now request-template driven rather than vendor-graph driven. The 
 
 Decision Module Runtime is a full-stack workbench for assembling an auditable decision graph from validated modules, deterministic calculations, provenance, and an explicit human decision gate.
 
+## Portfolio case study
+
+This project is **Inspectable AI Systems / 03 — Generative UI** and is the architecture-focused project in the series. Its central question is: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?**
+
+The empty workspace is now the case-study surface. It exposes the trust boundary before any graph exists, then makes the representative interaction the actual runtime flow: choose a different decision request → generate a structured module plan → human approval → instantiate registered modules → edit dependencies → reject cycles → deterministically recompute affected downstream modules.
+
+![Decision Module Runtime portfolio overview](docs/portfolio-overview.png)
+
+**Common approach:** prompt → model-authored UI/code → execute.  
+**This runtime:** prompt → structured proposal → human approval → closed registry → validated DAG → deterministic compute → separate human decision.
+
 The project began as an interaction experiment called **Generative Decision Surface**. The current implementation treats generated planning as an adapter around a closed runtime rather than allowing an AI model to create arbitrary trusted UI or calculation logic.
 
 ## Problem

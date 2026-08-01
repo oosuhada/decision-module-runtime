@@ -28,6 +28,7 @@ import { DecisionCanvas } from '../canvas/DecisionCanvas';
 import { MobileWorkspace } from '../canvas/MobileWorkspace';
 import { RuntimeGuide } from '../components/RuntimeGuide';
 import { ModuleCatalog } from '../components/ModuleCatalog';
+import { PortfolioNarrative } from '../components/PortfolioNarrative';
 import { Inspector } from '../provenance/Inspector';
 import { branchWorkspaceUrl, ensureWorkspaceUrl, resolveWorkspaceRoute } from '../routes/workspaceRoute';
 import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/workspace';
@@ -336,7 +337,7 @@ export function DecisionWorkspace() {
         {!workspace.modules.length && !workspace.plan ? (
           <div className="blank-workspace">
             <div className="origin-cross"><i /><i /><span>0,0</span></div>
-            <div className="blank-message"><Network size={25} /><span>QUICK START / NO EXECUTABLE GRAPH</span><h1>Choose a decision type, then inspect the graph it actually needs.</h1><p>The local planner selects a different closed-registry composition for vendor selection, build vs buy, product launch, rollout strategy, and architecture choice. You can then add, remove, or reconnect registered modules without executing generated code.</p><div className="blank-actions"><button className="primary" disabled={isReadonly || isRunning} onClick={() => void loadGuidedDemo()}><Play size={13} fill="currentColor" /> LOAD BUILD / BUY DEMO</button><button disabled={isReadonly} onClick={() => void createPlan()}>PLAN CURRENT REQUEST</button><button disabled={isReadonly} onClick={() => setCatalogOpen(true)}><PackagePlus size={13} /> OPEN MODULE CATALOG</button></div><small>Every graph edit is schema validated, cycle checked, deterministically recomputed, auditable, and undoable.</small></div>
+            <PortfolioNarrative disabled={isReadonly || isRunning} onPlan={() => void createPlan()} onDemo={() => void loadGuidedDemo()} onCatalog={() => setCatalogOpen(true)} />
           </div>
         ) : null}
         {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}
