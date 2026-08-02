@@ -8,9 +8,27 @@ Decision Module Runtime is a full-stack workbench for assembling an auditable de
 
 This project is **Inspectable AI Systems / 03 — Generative UI** and is the architecture-focused project in the series. Its central question is: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?**
 
-The empty workspace is now the case-study surface. It exposes the trust boundary before any graph exists, then makes the representative interaction the actual runtime flow: choose a different decision request → generate a structured module plan → human approval → instantiate registered modules → edit dependencies → reject cycles → deterministically recompute affected downstream modules.
+The empty workspace is now the case-study surface. It exposes the trust boundary before any graph exists, then hands off to the actual runtime. Once a graph exists, the right-side **Live Runtime Proof** uses the production store functions themselves: it attempts an illegal reverse dependency through `connectModules()` and mutates a real upstream input through `setInput()` so cycle rejection, downstream recomputation, audit output, and stale human-decision clearing are observable rather than merely described.
 
-![Decision Module Runtime portfolio overview](docs/portfolio-overview.png)
+### Killer interaction — constrained generation becomes a real DAG
+
+![Trust boundary before graph assembly](docs/portfolio/01-killer-boundary.png)
+
+![Runtime execution architecture](docs/portfolio/02-architecture.png)
+
+After guided assembly, the screenshot below is the actual module graph and runtime state:
+
+![Live registered-module graph after assembly](docs/portfolio/03-live-graph.png)
+
+### Runtime proofs
+
+The live graph validator rejects an attempted reverse edge that would create a cycle:
+
+![Live DAG cycle rejection](docs/portfolio/04-cycle-rejected.png)
+
+Mutating an upstream registered input triggers deterministic downstream recomputation and records the exact chain in audit state:
+
+![Live downstream recomputation proof](docs/portfolio/05-recompute.png)
 
 **Common approach:** prompt → model-authored UI/code → execute.  
 **This runtime:** prompt → structured proposal → human approval → closed registry → validated DAG → deterministic compute → separate human decision.

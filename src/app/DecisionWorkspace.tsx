@@ -28,7 +28,7 @@ import { DecisionCanvas } from '../canvas/DecisionCanvas';
 import { MobileWorkspace } from '../canvas/MobileWorkspace';
 import { RuntimeGuide } from '../components/RuntimeGuide';
 import { ModuleCatalog } from '../components/ModuleCatalog';
-import { PortfolioNarrative } from '../components/PortfolioNarrative';
+import { PortfolioNarrative, RuntimeProofPanel } from '../components/PortfolioNarrative';
 import { Inspector } from '../provenance/Inspector';
 import { branchWorkspaceUrl, ensureWorkspaceUrl, resolveWorkspaceRoute } from '../routes/workspaceRoute';
 import { createEmptyWorkspace, workspaceDocumentSchema } from '../schemas/workspace';
@@ -103,6 +103,7 @@ export function DecisionWorkspace() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [proofMessage, setProofMessage] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const inputPackRef = useRef<HTMLInputElement | null>(null);
 
@@ -220,6 +221,44 @@ export function DecisionWorkspace() {
 
   const cancel = () => abortRef.current?.abort();
 
+  const proveCycleRejection = () => {
+    const current = useWorkspaceStore.getState().workspace;
+    const edge = current?.edges[0];
+    if (!current || !edge) { setProofMessage('No existing dependency is available yet. Assemble a graph first.'); return; }
+    const result = connectModules(edge.target, edge.source);
+    setProofMessage(result.ok ? 'Unexpectedly accepted reverse dependency.' : `REJECTED BY LIVE DAG VALIDATOR · ${result.reason}`);
+  };
+
+  const proveRecompute = () => {
+    const current = useWorkspaceStore.getState().workspace;
+    if (!current) return;
+    const weights = current.modules.find((module) => module.type === 'criteria-weights');
+    if (weights && weights.input.weights && typeof weights.input.weights === 'object' && !Array.isArray(weights.input.weights)) {
+      const nextWeights = { ...(weights.input.weights as Record<string, number>) };
+      const key = Object.keys(nextWeights)[0];
+      if (key) nextWeights[key] = Math.max(0, Math.min(100, Number(nextWeights[key] ?? 0) + 1));
+      setInput(weights.id, { weights: nextWeights });
+      const next = useWorkspaceStore.getState().workspace;
+      const audit = next ? [...next.audit].reverse().find((event) => event.kind === 'input-changed') : null;
+      setProofMessage(`LIVE RECOMPUTE · ${audit?.detail ?? `${weights.id} changed`} · human decision ${next?.decision.humanChoice ? 'retained' : 'cleared if previously recorded'}`);
+      return;
+    }
+    const scorer = current.modules.find((module) => ['build-buy-economics', 'launch-readiness', 'rollout-sequencer', 'architecture-fit', 'vendor-matrix'].includes(module.type));
+    const rowsKey = scorer?.type === 'vendor-matrix' ? 'vendors' : 'options';
+    const rows = scorer ? scorer.input[rowsKey] : null;
+    if (scorer && Array.isArray(rows) && rows[0] && typeof rows[0] === 'object') {
+      const nextRows = structuredClone(rows) as Array<Record<string, unknown>>;
+      const numericKey = Object.keys(nextRows[0]).find((key) => typeof nextRows[0][key] === 'number');
+      if (numericKey) nextRows[0][numericKey] = Math.max(0, Math.min(100, Number(nextRows[0][numericKey]) + 1));
+      setInput(scorer.id, { [rowsKey]: nextRows });
+      const next = useWorkspaceStore.getState().workspace;
+      const audit = next ? [...next.audit].reverse().find((event) => event.kind === 'input-changed') : null;
+      setProofMessage(`LIVE RECOMPUTE · ${audit?.detail ?? `${scorer.id} changed`}`);
+      return;
+    }
+    setProofMessage('No safely mutable numeric upstream input was found in this graph.');
+  };
+
   const branchFromSnapshot = (snapshotId: string) => {
     if (!workspace) return;
     const snapshot = workspace.snapshots.find((candidate) => candidate.id === snapshotId);
@@ -299,7 +338,7 @@ export function DecisionWorkspace() {
   return (
     <main className={`surface-shell ${lowPower ? 'low-power' : ''}`}>
       <header className="workbench-header">
-        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ validated runtime</span><button className="runtime-guide-trigger" type="button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>HOW TO USE</button></div>
+        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ INSPECTABLE AI 03 · AI COMPOSES / REGISTRY EXECUTES</span><button className="runtime-guide-trigger" type="button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>HOW TO USE</button></div>
         <nav aria-label="Workspace views">
           <button className={viewMode === 'canvas' ? 'active' : ''} onClick={() => setViewMode('canvas')}>CANVAS</button>
           <button className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}><ListTree size={12} /> LIST/TREE</button>
@@ -349,6 +388,7 @@ export function DecisionWorkspace() {
       <aside className="compute-log">
         <div className="compute-title"><Activity size={12} /> RUNTIME LOG</div>
         <div className="winner-readout"><span>SYSTEM RECOMMENDATION</span><strong>{workspace.decision.recommendation ?? '—'}</strong><b>{workspace.decision.humanChoice ? 'HUMAN ✓' : 'OPEN'}</b></div>
+        {workspace.modules.length ? <RuntimeProofPanel workspace={workspace} message={proofMessage} onCycleProof={proveCycleRejection} onRecomputeProof={proveRecompute} /> : null}
         <div className="dependency-list">
           <span>DECISION STATE</span>
           <div><Eye size={11} /><span>missing evidence</span><b>{workspace.plan?.missingInputs.length ?? 0}</b></div>
