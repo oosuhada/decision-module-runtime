@@ -4,7 +4,7 @@
 
 | Reference | License | Files/feature used | Changes made | Credit location |
 |---|---|---|---|---|
-| xyflow / React Flow | MIT | `src/canvas/DecisionCanvas.tsx` | Editable generated instruments, ports, data edges, node movement, overview and delete affordances | `CREDITS.md` |
+| xyflow / React Flow | MIT | `src/canvas/DecisionCanvas.tsx` | Editable generated instruments plus the official custom-edge / `EdgeToolbar` pattern adapted into dependency surgery controls and blast-radius inspection | `CREDITS.md` |
 | OpenGenerativeUI | MIT | `src/protocol/actions.ts`, `src/agent/provider.ts`, `src/agent/PlanApproval.tsx` | Adapted plan → approve → streamed structured actions → validated render; implementation is original to this repo | `CREDITS.md` |
 | genui-canvas | MIT | `src/workspaces/store.ts`, `src/runtime/dispatcher.ts` | Adapted bidirectional agent/canvas state into explicit actor-labelled commands and persistent audit events | `CREDITS.md` |
 | Zustand | MIT | `src/workspaces/store.ts` | Persistent workspace state, undo/redo, snapshots, focus and mobile mode | `CREDITS.md` |

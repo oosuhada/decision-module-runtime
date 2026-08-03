@@ -10,19 +10,12 @@ const story = [
   ['RESULT', 'The workspace can be generative in shape while remaining constrained, explainable, and human-governed.'],
 ];
 
-const series = [
-  ['01', 'Research', 'https://signals.oosu.dev/'],
-  ['02', 'Decisions', 'https://scenario.oosu.dev/'],
-  ['03', 'Generative UI', 'https://decision.oosu.dev/'],
-  ['04', 'Memory', 'https://memory.oosu.dev/'],
-] as const;
-
 export function PortfolioNarrative({ onPlan, onDemo, onCatalog, disabled }: { onPlan: () => void; onDemo: () => void; onCatalog: () => void; disabled: boolean }) {
   return (
     <div className="runtime-portfolio">
       <section className="runtime-case-hero">
         <div>
-          <span className="runtime-thesis">INSPECTABLE AI SYSTEMS · GENERATIVE UI / 03 OF 04</span>
+          <span className="runtime-thesis">DECISION MODULE RUNTIME · CLOSED-REGISTRY GENERATIVE UI</span>
           <span className="runtime-kicker"><ShieldCheck size={12} /> KILLER INTERACTION / CONSTRAINED GENERATION</span>
           <h1>AI can compose the workspace. It cannot invent trusted executable logic.</h1>
           <p>Choose a decision type above, generate a real structured plan, approve it, then edit the registered-module DAG. The exact same runtime validates every mutation and recomputes downstream state.</p>
@@ -54,7 +47,6 @@ export function PortfolioNarrative({ onPlan, onDemo, onCatalog, disabled }: { on
             <article className="wide"><Database size={14} /><span>STATE + AUDIT</span><b>IndexedDB + FastAPI</b><small>snapshots · branches · provenance · human decision invalidation</small></article>
           </div></section>
           <section className="runtime-story">{story.map(([label, body], index) => <article key={label}><span>{String(index + 1).padStart(2, '0')} / {label}</span><p>{body}</p></article>)}</section>
-          <nav className="runtime-series-nav" aria-label="Inspectable AI Systems series">{series.map(([index, label, href]) => <a key={index} className={index === '03' ? 'active' : ''} href={href}><span>{index}</span><b>{label}</b></a>)}</nav>
         </div>
       </details>
     </div>

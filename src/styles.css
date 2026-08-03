@@ -66,9 +66,37 @@ button:disabled { opacity: .42; cursor: not-allowed !important; }
 .workspace-frame .react-flow__controls { border-radius: 0; box-shadow: none; border: 1px solid #b9bdc2; }
 .workspace-frame .react-flow__controls-button { border-radius: 0; background: #fff; border-color: #d0d3d7; }
 .data-edge .react-flow__edge-path { stroke: #526476; stroke-width: 1.2; }
+.data-edge .react-flow__edge-interaction { cursor: pointer; }
+.data-edge:hover .react-flow__edge-path { stroke: #255bff; stroke-width: 2.2; }
+.edge-surgery-handle { position: absolute; z-index: 12; width: 20px; height: 20px; border: 1px solid #a7adb3; background: rgba(250,251,252,.96); color: #68727b; display: grid; place-items: center; padding: 0; cursor: pointer; box-shadow: 2px 2px 0 rgba(28,33,38,.08); pointer-events: all; }
+.edge-surgery-handle:hover, .edge-surgery-handle.active { border-color: #255bff; background: #255bff; color: #fff; transform-origin: center; }
+.graph-impact-muted .edge-surgery-handle { opacity: .2; }
 .data-edge.react-flow__edge.animated path { stroke-dasharray: 3 5; }
+.workspace-frame .react-flow__node.graph-impact-muted { opacity: .14; filter: grayscale(.7); transition: opacity .2s ease, filter .2s ease; }
+.workspace-frame .react-flow__node.graph-impact-source, .workspace-frame .react-flow__node.graph-impact-target, .workspace-frame .react-flow__node.graph-impact-affected { opacity: 1; filter: none; z-index: 8 !important; }
+.workspace-frame .react-flow__node.graph-impact-source .instrument-shell { border-color: #255bff; box-shadow: 0 0 0 2px rgba(35,91,255,.12), 5px 5px 0 rgba(42,45,49,.08); }
+.workspace-frame .react-flow__node.graph-impact-target .instrument-shell { border-color: #9d5d22; box-shadow: 0 0 0 2px rgba(157,93,34,.12), 5px 5px 0 rgba(42,45,49,.08); }
+.workspace-frame .react-flow__node.graph-impact-affected .instrument-shell { border-color: #7b838b; }
+.workspace-frame .react-flow__edge.graph-impact-muted { opacity: .07; }
+.workspace-frame .react-flow__edge.graph-impact-selected .react-flow__edge-path { stroke: #255bff; stroke-width: 2.6; filter: drop-shadow(0 0 3px rgba(35,91,255,.3)); }
+.workspace-frame .react-flow__edge.graph-impact-downstream .react-flow__edge-path { stroke: #8a5a2b; stroke-width: 1.8; }
 .surface-shell.low-power .react-flow__edge.animated path { animation: none !important; }
 .react-flow__handle.data-handle { width: 8px; height: 8px; border-radius: 0; border: 1px solid #6c747d; background: #f8f9fa; }
+.graph-surgery-panel { position: absolute; z-index: 24; left: 18px; bottom: 18px; width: min(520px, calc(100% - 36px)); border: 1px solid #77818a; background: rgba(249,250,251,.97); box-shadow: 8px 8px 0 rgba(31,36,42,.09); backdrop-filter: blur(10px); }
+.graph-surgery-panel > header { min-height: 38px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #c5c9cd; padding: 0 9px 0 12px; }
+.graph-surgery-panel > header div { display: flex; align-items: center; gap: 6px; color: #47545f; font: 7px var(--mono); letter-spacing: .08em; }
+.graph-surgery-panel > header button { width: 28px; height: 28px; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.graph-surgery-panel > strong { display: block; padding: 12px 12px 0; font: 600 13px var(--mono); color: #1f262c; }
+.graph-surgery-panel > p { margin: 6px 12px 10px; color: #677078; font-size: 9px; line-height: 1.5; }
+.graph-impact-chain { display: flex; gap: 5px; overflow-x: auto; padding: 0 12px 12px; }
+.graph-impact-chain span { position: relative; flex: 0 0 140px; min-height: 62px; border: 1px solid #c1c6cb; background: #f3f5f6; padding: 8px; display: grid; align-content: center; gap: 3px; font: 8px/1.25 var(--mono); }
+.graph-impact-chain span:not(:last-child)::after { content: '→'; position: absolute; right: -7px; top: 50%; z-index: 2; color: #59636c; }
+.graph-impact-chain b { color: #255bff; font-size: 7px; }
+.graph-impact-chain small { color: #7a8289; font: 6px var(--mono); }
+.graph-surgery-panel > footer { min-height: 48px; border-top: 1px solid #c5c9cd; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 10px 8px 12px; }
+.graph-surgery-panel > footer span { color: #687179; font: 7px/1.4 var(--mono); }
+.graph-surgery-panel > footer button { min-height: 32px; border: 1px solid #8b3c2b; background: #fff; color: #8b3c2b; padding: 0 9px; display: inline-flex; align-items: center; gap: 5px; font: 7px var(--mono); cursor: pointer; }
+.graph-surgery-panel > footer button:hover { background: #8b3c2b; color: #fff; }
 
 .blank-workspace { position: absolute; inset: 0; background-image: linear-gradient(#d8dadd 1px, transparent 1px), linear-gradient(90deg, #d8dadd 1px, transparent 1px); background-size: 20px 20px; display: grid; place-items: start center; overflow: auto; padding: 28px; }
 .blank-workspace::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 48%, rgba(255,255,255,.96), rgba(248,249,250,.5) 42%, transparent 72%); }

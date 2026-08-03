@@ -6,29 +6,33 @@ Decision Module Runtime is a full-stack workbench for assembling an auditable de
 
 ## Portfolio case study
 
-This project is **Inspectable AI Systems / 03 — Generative UI** and is the architecture-focused project in the series. Its central question is: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?**
+Decision Module Runtime is an independent runtime experiment around one question: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?**
 
-The empty workspace is now the case-study surface. It exposes the trust boundary before any graph exists, then hands off to the actual runtime. Once a graph exists, the right-side **Live Runtime Proof** uses the production store functions themselves: it attempts an illegal reverse dependency through `connectModules()` and mutates a real upstream input through `setInput()` so cycle rejection, downstream recomputation, audit output, and stale human-decision clearing are observable rather than merely described.
+The default workspace is now sample-first rather than empty: a fresh browser automatically assembles an editable **Build vs Buy** reference graph through the same deterministic planner / registered-module protocol used by user requests. Once a graph exists, the right-side **Live Runtime Proof** uses the production store functions themselves: it attempts an illegal reverse dependency through `connectModules()` and mutates a real upstream input through `setInput()` so cycle rejection, downstream recomputation, audit output, and stale human-decision clearing are observable rather than merely described.
 
-### Killer interaction — constrained generation becomes a real DAG
+### Reference workspace — a real DAG on first visit
 
-![Trust boundary before graph assembly](docs/portfolio/01-killer-boundary.png)
+![Editable registered-module reference graph on first visit](docs/portfolio/01-reference-workspace.png)
 
-![Runtime execution architecture](docs/portfolio/02-architecture.png)
+### Killer interaction — dependency Graph Surgery
 
-After guided assembly, the screenshot below is the actual module graph and runtime state:
+Dependency edges use React Flow's custom-edge / `EdgeToolbar` pattern. Opening an edge computes its downstream impact cone before mutation, dims unrelated modules, and exposes the exact modules that would be recomputed if the dependency were disconnected.
 
-![Live registered-module graph after assembly](docs/portfolio/03-live-graph.png)
+![Dependency blast radius opened from the live graph edge](docs/portfolio/02-graph-surgery.png)
 
-### Runtime proofs
+### Runtime proof — invalid topology is rejected
 
 The live graph validator rejects an attempted reverse edge that would create a cycle:
 
-![Live DAG cycle rejection](docs/portfolio/04-cycle-rejected.png)
+![Live DAG cycle rejection](docs/portfolio/03-cycle-rejection.png)
 
 Mutating an upstream registered input triggers deterministic downstream recomputation and records the exact chain in audit state:
 
 ![Live downstream recomputation proof](docs/portfolio/05-recompute.png)
+
+### Architecture proof
+
+![Runtime execution architecture](docs/portfolio/02-architecture.png)
 
 **Common approach:** prompt → model-authored UI/code → execute.  
 **This runtime:** prompt → structured proposal → human approval → closed registry → validated DAG → deterministic compute → separate human decision.

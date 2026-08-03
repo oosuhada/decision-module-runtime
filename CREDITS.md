@@ -6,7 +6,7 @@ Generative Decision Workspace uses open-source libraries as infrastructure; its 
 - Repository: https://github.com/xyflow/xyflow
 - Steward: webkid GmbH and contributors
 - License: MIT
-- Use: draggable spatial workspace, dependency connectors, pan/zoom, and node handles.
+- Use: draggable spatial workspace, dependency connectors, pan/zoom, node handles, and the MIT-licensed React Flow custom-edge / `EdgeToolbar` pattern adapted into dependency surgery controls.
 
 ## Zustand
 - Repository: https://github.com/pmndrs/zustand

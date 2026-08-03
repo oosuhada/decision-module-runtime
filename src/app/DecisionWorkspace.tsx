@@ -106,6 +106,7 @@ export function DecisionWorkspace() {
   const [proofMessage, setProofMessage] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const inputPackRef = useRef<HTMLInputElement | null>(null);
+  const autoReferenceLoaded = useRef(false);
 
   useEffect(() => {
     if (!route.shareToken) ensureWorkspaceUrl(route.workspaceId, route.readonly);
@@ -179,7 +180,7 @@ export function DecisionWorkspace() {
     void assemble(false);
   };
 
-  const loadGuidedDemo = async () => {
+  const loadGuidedDemo = async (openGuide = true) => {
     const current = useWorkspaceStore.getState().workspace;
     if (!current || current.mode === 'readonly' || planning) return;
     abortRef.current?.abort();
@@ -197,11 +198,15 @@ export function DecisionWorkspace() {
       approvePlan();
       setPlanning(false);
       await assemble(false);
-      setGuideStep(0);
-      setGuideOpen(true);
-      focusModule('evidence');
-      setInspectorOpen(true);
-      setStatusMessage('Guided reference graph ready · replace synthetic inputs with your own');
+      if (openGuide) {
+        setGuideStep(0);
+        setGuideOpen(true);
+        focusModule('evidence');
+        setInspectorOpen(true);
+        setStatusMessage('Guided reference graph ready · replace synthetic inputs with your own');
+      } else {
+        setStatusMessage('Reference workspace ready · inspect, mutate, or replace the synthetic inputs');
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') setStatusMessage('Guided demo cancelled');
       else setStatusMessage(error instanceof Error ? error.message : 'Could not load guided demo');
@@ -209,6 +214,15 @@ export function DecisionWorkspace() {
       setPlanning(false);
     }
   };
+
+  useEffect(() => {
+    if (!hydrated || !workspace || workspace.mode === 'readonly' || autoReferenceLoaded.current) return;
+    if (workspace.id !== 'vendor-evaluation' || workspace.modules.length || workspace.plan) return;
+    autoReferenceLoaded.current = true;
+    void loadGuidedDemo(false);
+  // First-load bootstrap only; subsequent edits remain entirely user-owned.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, workspace?.id, workspace?.modules.length, workspace?.plan, workspace?.mode]);
 
   const rejectPlan = () => {
     if (!workspace) return;
@@ -338,7 +352,7 @@ export function DecisionWorkspace() {
   return (
     <main className={`surface-shell ${lowPower ? 'low-power' : ''}`}>
       <header className="workbench-header">
-        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ INSPECTABLE AI 03 · AI COMPOSES / REGISTRY EXECUTES</span><button className="runtime-guide-trigger" type="button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>HOW TO USE</button></div>
+        <div className="surface-brand"><Boxes size={16} /><b>DECISION MODULE WORKBENCH</b><span>/ AI COMPOSES · CLOSED REGISTRY EXECUTES</span><button className="runtime-guide-trigger" type="button" onClick={() => { setGuideStep(0); setGuideOpen(true); }}>HOW TO USE</button></div>
         <nav aria-label="Workspace views">
           <button className={viewMode === 'canvas' ? 'active' : ''} onClick={() => setViewMode('canvas')}>CANVAS</button>
           <button className={viewMode === 'tree' ? 'active' : ''} onClick={() => setViewMode('tree')}><ListTree size={12} /> LIST/TREE</button>
@@ -376,10 +390,10 @@ export function DecisionWorkspace() {
         {!workspace.modules.length && !workspace.plan ? (
           <div className="blank-workspace">
             <div className="origin-cross"><i /><i /><span>0,0</span></div>
-            <PortfolioNarrative disabled={isReadonly || isRunning} onPlan={() => void createPlan()} onDemo={() => void loadGuidedDemo()} onCatalog={() => setCatalogOpen(true)} />
+            <PortfolioNarrative disabled={isReadonly || isRunning} onPlan={() => void createPlan()} onDemo={() => void loadGuidedDemo(true)} onCatalog={() => setCatalogOpen(true)} />
           </div>
         ) : null}
-        {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}
+        {workspace.modules.length && viewMode === 'canvas' ? <DecisionCanvas workspace={workspace} quietMotion={quietMotion} onMove={moveModule} actions={{ setInput, removeModule, recordDecision, disconnectEdge, focusModule: (id) => { focusModule(id); setInspectorOpen(true); } }} /> : null}
         {workspace.modules.length && viewMode === 'tree' ? <AccessibleDecisionTree workspace={workspace} onInput={setInput} onDecision={recordDecision} onRemove={removeModule} onFocus={(id) => { focusModule(id); setInspectorOpen(true); }} /> : null}
         {isRunning ? <div className="assembly-trace" role="status" aria-live="polite"><span><Activity size={11} /> VALIDATED ASSEMBLY</span><div>{statusMessage}<i /></div></div> : null}
         <MobileWorkspace workspace={workspace} mode={mobileMode} focusedId={focusedModuleId} onMode={setMobileMode} onFocus={focusModule} onInput={setInput} onDecision={recordDecision} />
