@@ -1,128 +1,134 @@
 # Decision Module Runtime
 
-The runtime is now request-template driven rather than vendor-graph driven. The deterministic planner selects distinct registered-module DAGs for **vendor selection, build vs buy, product launch, rollout strategy, and architecture choice**, with dedicated closed-registry scoring modules for each domain. A new Module Catalog lets users add/remove registered modules, connect or disconnect dependencies, reject cycles, and deterministically recompute the edited graph without executing generated code.
+**A trusted generative-UI runtime where AI may compose a decision workspace but cannot invent executable business logic.**  
+**AI가 의사결정 워크스페이스의 구성을 제안할 수는 있지만, 실행되는 비즈니스 로직 자체를 만들어낼 수는 없도록 제한한 trusted generative-UI runtime입니다.**
 
-Decision Module Runtime is a full-stack workbench for assembling an auditable decision graph from validated modules, deterministic calculations, provenance, and an explicit human decision gate.
+**Live demo / 라이브 데모:** https://decision.oosu.dev/
 
-## Portfolio case study
+## Overview / 개요
 
-Decision Module Runtime is an independent runtime experiment around one question: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?**
+Decision Module Runtime asks: **can AI change the shape of a trusted application without being allowed to invent the trusted logic that executes inside it?** Agent output is a structured plan; only registered modules with known schemas, renderers, formulas, and dependency semantics can enter the trusted DAG.
 
-The default workspace is now sample-first rather than empty: a fresh browser automatically assembles an editable **Build vs Buy** reference graph through the same deterministic planner / registered-module protocol used by user requests. Once a graph exists, the right-side **Live Runtime Proof** uses the production store functions themselves: it attempts an illegal reverse dependency through `connectModules()` and mutates a real upstream input through `setInput()` so cycle rejection, downstream recomputation, audit output, and stale human-decision clearing are observable rather than merely described.
+Decision Module Runtime은 **AI가 신뢰된 애플리케이션의 형태를 바꾸면서도, 그 안에서 실행되는 신뢰 로직을 임의로 만들지 못하게 할 수 있는가?**를 다룹니다. Agent output은 structured plan이며, schema·renderer·formula·dependency semantics가 미리 등록된 module만 trusted DAG에 들어갈 수 있습니다.
 
-### Reference workspace — a real DAG on first visit
+The first visit loads a real editable reference graph instead of an empty canvas so the runtime, provenance, recomputation, and graph controls can be inspected immediately.
 
-![Editable registered-module reference graph on first visit](docs/portfolio/01-reference-workspace.png)
+첫 방문부터 빈 Canvas 대신 실제로 편집 가능한 reference graph를 조립해 runtime, provenance, recomputation, graph control을 바로 탐색할 수 있습니다.
 
-### Killer interaction — dependency Graph Surgery
+## Reference workspace / 레퍼런스 워크스페이스
 
-Dependency edges use React Flow's custom-edge / `EdgeToolbar` pattern. Opening an edge computes its downstream impact cone before mutation, dims unrelated modules, and exposes the exact modules that would be recomputed if the dependency were disconnected.
+![Reference decision workspace loaded on first visit](docs/portfolio/01-reference-workspace.png)
 
-![Dependency blast radius opened from the live graph edge](docs/portfolio/02-graph-surgery.png)
+The default Build-vs-Buy workspace is assembled from the same closed registry and deterministic runtime used for user-authored requests.
 
-### Runtime proof — invalid topology is rejected
+기본 Build-vs-Buy workspace 역시 사용자 request와 동일한 closed registry 및 deterministic runtime을 통해 조립됩니다.
 
-The live graph validator rejects an attempted reverse edge that would create a cycle:
+## Core interactions / 핵심 인터랙션
+
+### Graph Surgery / 그래프 서저리
+
+Dependency edges use React Flow custom edges and `EdgeToolbar`. Selecting an edge previews its downstream blast radius before mutation; `DISCONNECT + RECOMPUTE` edits the real DAG and recomputes affected modules.
+
+Dependency edge는 React Flow custom edge와 `EdgeToolbar`를 사용합니다. Edge를 선택하면 실제 변경 전에 downstream blast radius를 보여주며, `DISCONNECT + RECOMPUTE`를 실행하면 실제 DAG를 수정하고 영향받는 module을 다시 계산합니다.
+
+![Dependency blast-radius preview and graph surgery](docs/portfolio/02-graph-surgery.png)
+
+### Cycle rejection / 순환 의존성 거부
+
+The live graph validator rejects an edge that would introduce a cycle. The rejection uses the production graph function, not a separate demo-only rule.
+
+Live graph validator는 cycle을 만드는 edge를 실제 production graph function에서 거부합니다. 별도의 demo-only validation이 아닙니다.
 
 ![Live DAG cycle rejection](docs/portfolio/03-cycle-rejection.png)
 
-Mutating an upstream registered input triggers deterministic downstream recomputation and records the exact chain in audit state:
+### Selective recomputation / 선택적 재계산
 
-![Live downstream recomputation proof](docs/portfolio/05-recompute.png)
+Changing a registered upstream input marks and recomputes only affected downstream modules, records the chain in audit history, and invalidates a stale human decision when required.
 
-### Architecture proof
+Registered upstream input을 변경하면 영향받는 downstream module만 stale/recompute 처리하고, audit history에 정확한 chain을 기록하며 필요하면 기존 human decision을 무효화합니다.
 
-![Runtime execution architecture](docs/portfolio/02-architecture.png)
+## Architecture & Topics / 아키텍처 및 주제
 
-**Common approach:** prompt → model-authored UI/code → execute.  
-**This runtime:** prompt → structured proposal → human approval → closed registry → validated DAG → deterministic compute → separate human decision.
-
-The project began as an interaction experiment called **Generative Decision Surface**. The current implementation treats generated planning as an adapter around a closed runtime rather than allowing an AI model to create arbitrary trusted UI or calculation logic.
-
-## Problem
-
-AI-generated interfaces can look convincing while hiding where numbers came from, which dependencies changed, or whether the model invented a calculation. This project explores a stricter alternative: an agent may propose a plan, but only registered modules with known schemas, renderers, formulas, and dependency semantics can enter the trusted workspace.
-
-## Working flow
+### Architecture / 아키텍처
 
 ```text
-Write a decision request
-→ generate or load a module plan
-→ review the plan
-→ approve or reject it
-→ assemble registered modules
-→ connect dependencies
-→ compute deterministically
-→ edit human-owned inputs
-→ recompute affected modules
-→ inspect provenance and audit history
+Decision request
+  ↓
+Structured AgentPlan
+  ↓
+Human approval
+  ↓
+Closed Module Registry
+  ↓
+Schema + protocol validation
+  ↓
+Validated DAG
+  ↓
+Deterministic compute
+  ↓
+Audit / snapshots / provenance
+  ↓
+Separate human decision gate
+```
+
+- **Frontend/runtime:** React, TypeScript, xyflow, Zustand, Zod, Motion.
+- **Persistence:** IndexedDB local persistence plus FastAPI workspace persistence.
+- **Trust boundary:** generated arbitrary React/code/calculation logic never enters the trusted runtime.
+- **Module SDK:** versioned input/output schemas, registered renderers, formulas, and dependency semantics.
+
+- **프론트엔드/런타임:** React, TypeScript, xyflow, Zustand, Zod, Motion.
+- **영속성:** IndexedDB local persistence와 FastAPI workspace persistence.
+- **신뢰 경계:** 생성된 임의 React/code/calculation logic는 trusted runtime에 들어갈 수 없습니다.
+- **Module SDK:** versioned input/output schema, registered renderer, formula, dependency semantics를 사용합니다.
+
+### Topics / 주제
+
+[`generative-ui`](https://github.com/topics/generative-ui) · [`dag`](https://github.com/topics/dag) · [`workflow-engine`](https://github.com/topics/workflow-engine) · [`human-in-the-loop`](https://github.com/topics/human-in-the-loop) · [`runtime-validation`](https://github.com/topics/runtime-validation) · [`react-flow`](https://github.com/topics/react-flow) · [`zustand`](https://github.com/topics/zustand) · [`zod`](https://github.com/topics/zod) · [`typescript`](https://github.com/topics/typescript)
+
+## Working flow / 작업 흐름
+
+```text
+Write decision request / 의사결정 요청 작성
+→ generate structured plan / 구조화된 Plan 생성
+→ human approval / 사람의 승인
+→ assemble registered modules / 등록 Module 조립
+→ validate DAG / DAG 검증
+→ deterministic compute / 결정론적 계산
+→ edit inputs or dependencies / Input·Dependency 편집
+→ selective recompute / 영향 범위만 재계산
+→ inspect provenance & audit / Provenance·Audit 확인
 → snapshot / compare / branch
-→ record a human decision
-→ export or share read-only
+→ record human decision / 최종 Human Decision 기록
 ```
 
-## What is implemented
+## What is implemented / 구현 내용
 
-- Closed module registry with versioned input/output contracts.
-- Zod validation for plans, protocol actions, workspace documents, and module data.
-- DAG validation with cycle rejection.
-- Deterministic downstream recomputation and stale/error state propagation.
-- Human review before a planned graph is assembled.
-- Editable reference evidence, provenance locators, option names, and normalized option metrics so the built-in synthetic fixture can be replaced in-place with reviewed user inputs.
-- Undo/redo, named snapshots, restore, compare, and branch workflows.
-- Module-level provenance and workspace audit history.
-- Human decision gate separate from system recommendation.
-- Reusable decision input packs for importing/exporting evidence, source locators, options, weights, and budget without replacing runtime structure.
-- Recorded human decisions are invalidated when upstream inputs change so stale commitments cannot silently survive recomputation.
-- IndexedDB persistence with FastAPI synchronization.
-- Frozen read-only share snapshots and JSON export.
-- Accessible list/tree representation alongside the spatial canvas.
-- Mobile module stack, focused module, dependency path, and decision summary modes.
-- Sandboxed experimental preview boundary for untrusted HTML/JavaScript experiments.
-- Guided working graph that auto-assembles the editable synthetic reference case and walks through evidence replacement, option inputs, recommendation provenance, and the human decision gate.
+- Closed module registry with versioned input/output contracts.  
+  Versioned input/output contract를 가진 closed module registry.
+- Zod validation for plans, protocol actions, workspace documents, and module data.  
+  Plan, protocol action, workspace document, module data에 대한 Zod validation.
+- DAG validation, cycle rejection, stale/error propagation, and deterministic downstream recomputation.  
+  DAG validation, cycle rejection, stale/error propagation, deterministic downstream recomputation.
+- Human approval before assembly plus explicit human decision gate after computation.  
+  Assembly 전 Human Approval, 계산 후 별도의 Human Decision Gate.
+- Undo/redo, snapshots, restore, compare, branch, export, and read-only sharing.  
+  Undo/redo, snapshot, restore, compare, branch, export, read-only sharing.
+- Multiple request templates: Build vs Buy, Vendor Selection, Product Launch, Rollout Strategy, Architecture Choice.  
+  Build vs Buy, Vendor Selection, Product Launch, Rollout Strategy, Architecture Choice request template.
+- Module Catalog for adding/removing registered modules and connecting/disconnecting dependencies.  
+  Registered module 추가·삭제 및 dependency 연결·해제를 위한 Module Catalog.
 
-## Reference data honesty
+## Runtime boundary / 런타임 경계
 
-The built-in vendor example is explicitly **synthetic reference data**. Vendor names, benchmark scores, security reviews, and adoption evidence are placeholders for exercising the runtime. They do not represent real companies or measured outcomes.
+AI may propose **which registered modules to use and how to connect them**. It may not introduce arbitrary trusted code, hidden formulas, or unregistered executable UI. The calculation layer stays deterministic and inspectable.
 
-The local reference provider uses a deterministic plan so the complete runtime can be explored without model credentials. An external provider can be connected at the planning boundary, but it still cannot bypass the registered module contracts or become the source of numeric truth.
+AI는 **어떤 등록 Module을 사용할지, 어떻게 연결할지**를 제안할 수 있습니다. 하지만 임의의 trusted code, 숨겨진 formula, 등록되지 않은 executable UI를 추가할 수 없습니다. Calculation layer는 deterministic하고 inspectable하게 유지됩니다.
 
-## Runtime boundary
+Built-in reference inputs are synthetic and remain visibly distinguishable from user inputs.
 
-The trusted application never renders arbitrary model-authored React code.
+기본 reference input은 synthetic이며 사용자 입력과 명확하게 구분됩니다.
 
-An agent/provider can propose structured actions. The dispatcher validates protocol version, sequence, idempotency, module type, dependencies, and schema before state changes are committed. Calculations run inside registered deterministic module implementations.
-
-This means the generative layer can change the shape of the workspace without changing the rules that make the workspace trustworthy.
-
-## Architecture
-
-```text
-src/
-  agent/          planning-provider boundary and approval UI
-  protocol/       structured runtime actions
-  runtime/        dispatcher and dependency graph
-  modules/        closed module registry and renderers
-  provenance/     audit/provenance inspection
-  persistence/    IndexedDB persistence
-  canvas/         spatial and accessible workspace views
-  sandbox/        isolated experimental preview boundary
-  workspaces/     state, snapshots, export, branching
-
-backend/
-  app/            persistence/share API
-  migrations/     database schema history
-```
-
-## Design decisions
-
-**Why a closed module registry?** The goal is composability without giving generated output authority to invent trusted code paths.
-
-**Why deterministic reference planning?** It keeps the runtime inspectable and usable without credentials. Provider integration is replaceable; the runtime is the project.
-
-**Why keep a canvas?** Dependency topology is useful spatially, but a complete list/tree view exposes the same state for accessibility, inspection, and non-spatial workflows.
-
-## Local development
+## Local development / 로컬 개발
 
 ```bash
 corepack pnpm install
@@ -130,14 +136,15 @@ docker compose up -d
 corepack pnpm dev
 ```
 
-Default web address: `http://localhost:3103/w/vendor-evaluation`
+Default web address / 기본 주소: `http://localhost:3103`
 
-The deployed instance is linked from the repository homepage.
+## Project status / 프로젝트 상태
 
-## Project status
+This is a working architecture-focused reference implementation. It demonstrates a constrained generative runtime rather than a general-purpose secure execution sandbox for arbitrary third-party code.
 
-This is a working full-stack reference implementation for constrained generative interfaces and auditable decision tooling. It is not presented as a mature autonomous agent platform. Real organizational deployment would require authentication, authorization, provider governance, secrets management, operational monitoring, and domain-specific module review.
+동작하는 architecture-focused reference implementation입니다. 임의의 third-party code를 실행하는 범용 secure sandbox라기보다, 제한된 generative runtime의 신뢰 경계를 보여주는 프로젝트입니다.
 
-## Credits
+## Credits / 크레딧
 
-Third-party libraries and visual references are documented in [`CREDITS.md`](CREDITS.md) and the supporting `docs/` notes.
+Reference adoption and licenses are documented in [`CREDITS.md`](CREDITS.md) and [`docs/reference-adoption.md`](docs/reference-adoption.md).  
+외부 레퍼런스 적용 방식과 라이선스는 [`CREDITS.md`](CREDITS.md), [`docs/reference-adoption.md`](docs/reference-adoption.md)에 기록되어 있습니다.
