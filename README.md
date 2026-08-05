@@ -47,44 +47,6 @@ Changing a registered upstream input marks and recomputes only affected downstre
 
 Registered upstream input을 변경하면 영향받는 downstream module만 stale/recompute 처리하고, audit history에 정확한 chain을 기록하며 필요하면 기존 human decision을 무효화합니다.
 
-## Architecture & Topics / 아키텍처 및 주제
-
-### Architecture / 아키텍처
-
-```text
-Decision request
-  ↓
-Structured AgentPlan
-  ↓
-Human approval
-  ↓
-Closed Module Registry
-  ↓
-Schema + protocol validation
-  ↓
-Validated DAG
-  ↓
-Deterministic compute
-  ↓
-Audit / snapshots / provenance
-  ↓
-Separate human decision gate
-```
-
-- **Frontend/runtime:** React, TypeScript, xyflow, Zustand, Zod, Motion.
-- **Persistence:** IndexedDB local persistence plus FastAPI workspace persistence.
-- **Trust boundary:** generated arbitrary React/code/calculation logic never enters the trusted runtime.
-- **Module SDK:** versioned input/output schemas, registered renderers, formulas, and dependency semantics.
-
-- **프론트엔드/런타임:** React, TypeScript, xyflow, Zustand, Zod, Motion.
-- **영속성:** IndexedDB local persistence와 FastAPI workspace persistence.
-- **신뢰 경계:** 생성된 임의 React/code/calculation logic는 trusted runtime에 들어갈 수 없습니다.
-- **Module SDK:** versioned input/output schema, registered renderer, formula, dependency semantics를 사용합니다.
-
-### Topics / 주제
-
-[`generative-ui`](https://github.com/topics/generative-ui) · [`dag`](https://github.com/topics/dag) · [`workflow-engine`](https://github.com/topics/workflow-engine) · [`human-in-the-loop`](https://github.com/topics/human-in-the-loop) · [`runtime-validation`](https://github.com/topics/runtime-validation) · [`react-flow`](https://github.com/topics/react-flow) · [`zustand`](https://github.com/topics/zustand) · [`zod`](https://github.com/topics/zod) · [`typescript`](https://github.com/topics/typescript)
-
 ## Working flow / 작업 흐름
 
 ```text
@@ -118,33 +80,13 @@ Write decision request / 의사결정 요청 작성
 - Module Catalog for adding/removing registered modules and connecting/disconnecting dependencies.  
   Registered module 추가·삭제 및 dependency 연결·해제를 위한 Module Catalog.
 
-## Runtime boundary / 런타임 경계
+## Architecture & Topics / 아키텍처 및 주제
 
-AI may propose **which registered modules to use and how to connect them**. It may not introduce arbitrary trusted code, hidden formulas, or unregistered executable UI. The calculation layer stays deterministic and inspectable.
+**Architecture / 아키텍처**  
+[`dag`](https://github.com/topics/dag) · [`workflow-engine`](https://github.com/topics/workflow-engine) · [`plugin-architecture`](https://github.com/topics/plugin-architecture) · [`runtime-validation`](https://github.com/topics/runtime-validation) · [`schema-validation`](https://github.com/topics/schema-validation) · [`event-driven-architecture`](https://github.com/topics/event-driven-architecture) · [`state-machine`](https://github.com/topics/state-machine) · [`local-first`](https://github.com/topics/local-first)
 
-AI는 **어떤 등록 Module을 사용할지, 어떻게 연결할지**를 제안할 수 있습니다. 하지만 임의의 trusted code, 숨겨진 formula, 등록되지 않은 executable UI를 추가할 수 없습니다. Calculation layer는 deterministic하고 inspectable하게 유지됩니다.
+**Project context / 프로젝트 맥락**  
+[`generative-ui`](https://github.com/topics/generative-ui) · [`decision-intelligence`](https://github.com/topics/decision-intelligence) · [`human-in-the-loop`](https://github.com/topics/human-in-the-loop) · [`explainable-ai`](https://github.com/topics/explainable-ai) · [`auditability`](https://github.com/topics/auditability) · [`provenance`](https://github.com/topics/provenance) · [`decision-support`](https://github.com/topics/decision-support) · [`visual-programming`](https://github.com/topics/visual-programming) · [`graph-editor`](https://github.com/topics/graph-editor)
 
-Built-in reference inputs are synthetic and remain visibly distinguishable from user inputs.
-
-기본 reference input은 synthetic이며 사용자 입력과 명확하게 구분됩니다.
-
-## Local development / 로컬 개발
-
-```bash
-corepack pnpm install
-docker compose up -d
-corepack pnpm dev
-```
-
-Default web address / 기본 주소: `http://localhost:3103`
-
-## Project status / 프로젝트 상태
-
-This is a working architecture-focused reference implementation. It demonstrates a constrained generative runtime rather than a general-purpose secure execution sandbox for arbitrary third-party code.
-
-동작하는 architecture-focused reference implementation입니다. 임의의 third-party code를 실행하는 범용 secure sandbox라기보다, 제한된 generative runtime의 신뢰 경계를 보여주는 프로젝트입니다.
-
-## Credits / 크레딧
-
-Reference adoption and licenses are documented in [`CREDITS.md`](CREDITS.md) and [`docs/reference-adoption.md`](docs/reference-adoption.md).  
-외부 레퍼런스 적용 방식과 라이선스는 [`CREDITS.md`](CREDITS.md), [`docs/reference-adoption.md`](docs/reference-adoption.md)에 기록되어 있습니다.
+**Implementation stack / 구현 스택**  
+[`react`](https://github.com/topics/react) · [`typescript`](https://github.com/topics/typescript) · [`react-flow`](https://github.com/topics/react-flow) · [`zustand`](https://github.com/topics/zustand) · [`zod`](https://github.com/topics/zod) · [`motion`](https://github.com/topics/motion) · [`fastapi`](https://github.com/topics/fastapi) · [`indexeddb`](https://github.com/topics/indexeddb) · [`vite`](https://github.com/topics/vite)
