@@ -80,6 +80,33 @@ Write decision request / 의사결정 요청 작성
 - Module Catalog for adding/removing registered modules and connecting/disconnecting dependencies.  
   Registered module 추가·삭제 및 dependency 연결·해제를 위한 Module Catalog.
 
+## Decision engine package / 결정 엔진 패키지
+
+The framework-agnostic schemas, action protocol, registered deterministic modules, DAG validation, recomputation, and dispatcher are published as `@oosuhada/decision-engine` on GitHub Packages.
+
+UI에 종속되지 않는 schema, action protocol, deterministic module registry, DAG validation, recomputation, dispatcher를 GitHub Packages의 `@oosuhada/decision-engine`으로 배포합니다.
+
+Create or update `.npmrc` in the consuming project:
+
+```ini
+@oosuhada:registry=https://npm.pkg.github.com
+```
+
+Install the package:
+
+```bash
+npm install @oosuhada/decision-engine
+```
+
+```ts
+import {
+  createEmptyWorkspace,
+  dispatchProtocolAction,
+  recomputeGraph,
+  workspaceDocumentSchema,
+} from '@oosuhada/decision-engine';
+```
+
 ## Architecture & Topics / 아키텍처 및 주제
 
 **Architecture / 아키텍처**  
