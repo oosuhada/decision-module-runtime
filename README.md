@@ -47,6 +47,14 @@ Changing a registered upstream input marks and recomputes only affected downstre
 
 Registered upstream input을 변경하면 영향받는 downstream module만 stale/recompute 처리하고, audit history에 정확한 chain을 기록하며 필요하면 기존 human decision을 무효화합니다.
 
+### Graph-runtime performance evidence / 그래프 런타임 성능 증빙
+
+The selective-recompute hot path previously scanned the entire edge list for every visited descendant and filtered the edge list again for every module dependency. The runtime now builds outgoing/incoming adjacency once per recompute call and reuses it for cycle validation, descendant discovery, and dependency lookup.
+
+`scripts/benchmark-graph.mjs` compares the old descendant traversal against the production `affectedModuleIds` export on a synthetic **2,500-node / 9,990-edge DAG**, repeated 8 times. Median traversal time measured **69.9663 ms → 0.6290 ms (-99.1%)**. Unit tests remain **19/19 passing** and the production Vite build passes.
+
+The measurement boundary matters: this benchmark isolates descendant traversal. It is **not** a claim that the full UI or every decision recompute is 99% faster; schema validation and module formulas can dominate small real graphs. Machine-readable output is stored in `benchmarks/results/descendant-index-v1.json`.
+
 ## Working flow / 작업 흐름
 
 ```text

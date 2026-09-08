@@ -42,4 +42,16 @@ describe('deterministic graph runtime', () => {
     expect(rerun.computed).toContain('recommendation');
     expect(rerun.computed).not.toContain('weights');
   });
+
+  it('returns each affected descendant once even when multiple paths converge', () => {
+    const edges: WorkspaceEdge[] = [
+      { id: 'a-b', source: 'a', target: 'b' },
+      { id: 'a-c', source: 'a', target: 'c' },
+      { id: 'b-d', source: 'b', target: 'd' },
+      { id: 'c-d', source: 'c', target: 'd' },
+    ];
+    const affected = affectedModuleIds('a', edges);
+    expect(new Set(affected)).toEqual(new Set(['b', 'c', 'd']));
+    expect(affected).toHaveLength(3);
+  });
 });
