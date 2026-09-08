@@ -8,75 +8,84 @@ export class GraphCycleError extends Error {
   }
 }
 
-export function assertAcyclic(modules: ModuleInstance[], edges: WorkspaceEdge[]) {
+type GraphIndex = {
+  outgoing: Map<string, string[]>;
+  incoming: Map<string, string[]>;
+  indegree: Map<string, number>;
+};
+
+function buildGraphIndex(modules: ModuleInstance[], edges: WorkspaceEdge[]): GraphIndex {
   const ids = new Set(modules.map((module) => module.id));
-  const indegree = new Map([...ids].map((id) => [id, 0]));
   const outgoing = new Map([...ids].map((id) => [id, [] as string[]]));
+  const incoming = new Map([...ids].map((id) => [id, [] as string[]]));
+  const indegree = new Map([...ids].map((id) => [id, 0]));
   for (const edge of edges) {
     if (!ids.has(edge.source) || !ids.has(edge.target)) throw new Error(`Edge references missing module: ${edge.id}`);
     outgoing.get(edge.source)?.push(edge.target);
+    incoming.get(edge.target)?.push(edge.source);
     indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
   }
+  return { outgoing, incoming, indegree };
+}
+
+function topologicalOrderFromIndex(index: GraphIndex): string[] {
+  const indegree = new Map(index.indegree);
   const queue = [...indegree.entries()].filter(([, degree]) => degree === 0).map(([id]) => id);
-  let visited = 0;
-  while (queue.length) {
-    const current = queue.shift();
-    if (!current) break;
-    visited += 1;
-    for (const target of outgoing.get(current) ?? []) {
+  const order: string[] = [];
+  let cursor = 0;
+  while (cursor < queue.length) {
+    const current = queue[cursor++];
+    order.push(current);
+    for (const target of index.outgoing.get(current) ?? []) {
       const next = (indegree.get(target) ?? 0) - 1;
       indegree.set(target, next);
       if (next === 0) queue.push(target);
     }
   }
-  if (visited !== modules.length) throw new GraphCycleError();
-}
-
-export function topologicalOrder(modules: ModuleInstance[], edges: WorkspaceEdge[]): string[] {
-  assertAcyclic(modules, edges);
-  const incoming = new Map(modules.map((module) => [module.id, 0]));
-  const outgoing = new Map(modules.map((module) => [module.id, [] as string[]]));
-  for (const edge of edges) {
-    incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
-    outgoing.get(edge.source)?.push(edge.target);
-  }
-  const queue = [...incoming.entries()].filter(([, count]) => count === 0).map(([id]) => id);
-  const order: string[] = [];
-  while (queue.length) {
-    const id = queue.shift();
-    if (!id) break;
-    order.push(id);
-    for (const target of outgoing.get(id) ?? []) {
-      const next = (incoming.get(target) ?? 0) - 1;
-      incoming.set(target, next);
-      if (next === 0) queue.push(target);
-    }
-  }
+  if (order.length !== indegree.size) throw new GraphCycleError();
   return order;
 }
 
-export function affectedModuleIds(sourceId: string, edges: WorkspaceEdge[]): string[] {
+function descendantsFromOutgoing(sourceId: string, outgoing: Map<string, string[]>): string[] {
   const affected = new Set<string>();
   const queue = [sourceId];
-  while (queue.length) {
-    const current = queue.shift();
-    if (!current) break;
-    for (const edge of edges) {
-      if (edge.source === current && !affected.has(edge.target)) {
-        affected.add(edge.target);
-        queue.push(edge.target);
-      }
+  let cursor = 0;
+  while (cursor < queue.length) {
+    const current = queue[cursor++];
+    for (const target of outgoing.get(current) ?? []) {
+      if (affected.has(target)) continue;
+      affected.add(target);
+      queue.push(target);
     }
   }
   return [...affected];
 }
 
+export function assertAcyclic(modules: ModuleInstance[], edges: WorkspaceEdge[]) {
+  topologicalOrderFromIndex(buildGraphIndex(modules, edges));
+}
+
+export function topologicalOrder(modules: ModuleInstance[], edges: WorkspaceEdge[]): string[] {
+  return topologicalOrderFromIndex(buildGraphIndex(modules, edges));
+}
+
+export function affectedModuleIds(sourceId: string, edges: WorkspaceEdge[]): string[] {
+  const outgoing = new Map<string, string[]>();
+  for (const edge of edges) {
+    const targets = outgoing.get(edge.source) ?? [];
+    targets.push(edge.target);
+    outgoing.set(edge.source, targets);
+  }
+  return descendantsFromOutgoing(sourceId, outgoing);
+}
+
 export type RecomputeResult = { modules: ModuleInstance[]; computed: string[]; failed: string[] };
 
 export function recomputeGraph(modules: ModuleInstance[], edges: WorkspaceEdge[], roots?: string[]): RecomputeResult {
-  const order = topologicalOrder(modules, edges);
+  const index = buildGraphIndex(modules, edges);
+  const order = topologicalOrderFromIndex(index);
   const requested = roots?.length
-    ? new Set(roots.flatMap((root) => [root, ...affectedModuleIds(root, edges)]))
+    ? new Set(roots.flatMap((root) => [root, ...descendantsFromOutgoing(root, index.outgoing)]))
     : new Set(order);
   const byId = new Map(modules.map((module) => [module.id, structuredClone(module)]));
   const computed: string[] = [];
@@ -94,7 +103,7 @@ export function recomputeGraph(modules: ModuleInstance[], edges: WorkspaceEdge[]
       failed.push(id);
       continue;
     }
-    const dependencyIds = edges.filter((edge) => edge.target === id).map((edge) => edge.source);
+    const dependencyIds = index.incoming.get(id) ?? [];
     const dependencyOutputs = Object.fromEntries(dependencyIds.map((dependencyId) => [dependencyId, byId.get(dependencyId)?.output ?? {}]));
     try {
       const output = contract.deterministicCompute({ module, dependencyOutputs });

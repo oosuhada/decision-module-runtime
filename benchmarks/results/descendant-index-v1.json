@@ -1,0 +1,32 @@
+{
+  "experiment": "decision-runtime-descendant-index-v1",
+  "git_sha": "60da75b5dde70e0d0fabe4a7f175d5e0716fa2dd",
+  "generated_at": "2026-09-08T13:21:44.002Z",
+  "fixture": {
+    "nodes": 2500,
+    "edges": 9990,
+    "fanout": 4,
+    "repeats": 8,
+    "source": "n-0"
+  },
+  "baseline": {
+    "algorithm": "scan every edge for every visited node",
+    "complexity": "O(VE)",
+    "median_ms": 70.338,
+    "p95_ms": 71.0826,
+    "mean_ms": 69.9599
+  },
+  "candidate": {
+    "algorithm": "build outgoing adjacency once, then BFS",
+    "complexity": "O(V+E)",
+    "median_ms": 0.6573,
+    "p95_ms": 1.1718,
+    "mean_ms": 0.6737
+  },
+  "median_improvement_percent": 99.07,
+  "limitations": [
+    "Synthetic DAG isolates descendant traversal; it is not end-to-end UI latency.",
+    "The full recompute path also validates schemas and executes module formulas, which can dominate small production graphs.",
+    "The runtime now reuses the same adjacency/incoming index within a recompute call, but the index is not persisted across separate graph mutations."
+  ]
+}

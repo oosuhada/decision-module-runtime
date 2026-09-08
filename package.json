@@ -37,6 +37,7 @@
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "eslint src --max-warnings 0",
     "test": "vitest run",
+    "benchmark:graph": "tsup src/index.ts --format esm,cjs --dts --out-dir dist-lib --clean && node scripts/benchmark-graph.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:all": "pnpm test && pnpm test:e2e",
